@@ -97,6 +97,9 @@ class OllamaServiceImpl implements OllamaService {
         final String text = (data['response'] as String?) ?? '';
         final bool isDone = (data['done'] as bool?) ?? false;
 
+        // Evitar emitir eventos vacíos que no sean de finalización
+        if (text.isEmpty && !isDone) continue;
+
         tokenCounter++;
         double currentTps = 0.0;
 
@@ -122,6 +125,10 @@ class OllamaServiceImpl implements OllamaService {
           evalCount: evalCount,
           evalDurationNano: evalDuration,
         );
+
+        if (isDone) {
+          break;
+        }
       }
     } catch (e) {
       throw Exception('Fallo en el streaming de Ollama: $e');

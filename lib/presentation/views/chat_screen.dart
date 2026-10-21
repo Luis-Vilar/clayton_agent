@@ -23,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
   double _currentTps = 0.0;
   int _gpuUsage = 0;
   bool _isGenerating = false;
+  bool _isScrollScheduled = false;
 
   @override
   void initState() {
@@ -40,13 +41,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _scrollToBottom() {
+    if (_isScrollScheduled) return;
+    _isScrollScheduled = true;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isScrollScheduled = false;
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-        );
+        // jumpTo evita sobrecargar el bucle de eventos con decenas de
+        // AnimationControllers concurrentes que se cancelan entre sí.
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -301,7 +304,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                         )
                                       : MarkdownBody(
                                           data: msg['text'] ?? '',
-                                          selectable: true,
+                                          // Se desactiva la selección en el mensaje activo durante la generación
+                                          // para evitar el cálculo continuo del árbol de selección en cada chunk.
+                                          selectable: !_isGenerating || index != _messages.length - 1,
                                         ),
                                 ),
                               );
@@ -324,11 +329,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               ),
                               const SizedBox(width: 10),
-                              Text(
-                                state.message,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
+                              Flexible(
+                                child: Text(
+                                  state.message,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],

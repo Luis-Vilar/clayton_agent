@@ -49,5 +49,10 @@ Future<void> initDependencies() async {
   );
 
   // 5. Blocs (Presentación) - registerFactory para que se creen instancias nuevas al usarse
-  getIt.registerFactory(() => RagBloc(repository: getIt()));
+  getIt.registerFactory(
+    () => RagBloc(
+      repository: getIt(),
+      gpuMetricsService: getIt(),
+    ),
+  );
 }

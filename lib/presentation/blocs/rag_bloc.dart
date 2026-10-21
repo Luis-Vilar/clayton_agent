@@ -170,7 +170,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
               question: event.question,
               answer: buffer.toString(),
               finalTps: tpsActual,
-              gpuUsagePercent: latestGpuUsage, // Captura o valor mais recente
+              gpuUsagePercent: 0, // Captura o valor mais recente
             );
           } else {
             return RagStreamingState(

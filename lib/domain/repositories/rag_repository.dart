@@ -68,7 +68,9 @@ class RagRepositoryImpl implements RagRepository {
   }
 
   @override
-  Future<List<String>> ingestAgentSkillsDirectory(String baseDirectoryPath) async {
+  Future<List<String>> ingestAgentSkillsDirectory(
+    String baseDirectoryPath,
+  ) async {
     final rootDir = Directory(baseDirectoryPath);
 
     if (!await rootDir.exists()) {
@@ -76,10 +78,17 @@ class RagRepositoryImpl implements RagRepository {
     }
 
     final List<String> filePaths = [];
-    await for (final FileSystemEntity entity in rootDir.list(recursive: true)) {
+    await for (final FileSystemEntity entity in rootDir.list(
+      recursive: true,
+      followLinks: false,
+    )) {
       if (entity is File &&
           (entity.path.endsWith('.md') || entity.path.endsWith('.markdown'))) {
-        filePaths.add(entity.path);
+        // Ignorar directorios o archivos ocultos como .git, .dart_tool, etc.
+        final parts = entity.path.split(Platform.pathSeparator);
+        if (!parts.any((p) => p.startsWith('.') && p.length > 1)) {
+          filePaths.add(entity.path);
+        }
       }
     }
 
@@ -120,12 +129,19 @@ class RagRepositoryImpl implements RagRepository {
         tokensPerSecond: chunk.tokensPerSecond,
         evalCount: chunk.evalCount,
       );
+      if (chunk.isDone) {
+        break;
+      }
     }
   }
 
   Future<String?> _buildPromptForQuestion(String question) async {
-    final List<double> rawQueryEmbedding = await ollamaService.getEmbedding(question);
-    final Float32List queryFloat32Embedding = Float32List.fromList(rawQueryEmbedding);
+    final List<double> rawQueryEmbedding = await ollamaService.getEmbedding(
+      question,
+    );
+    final Float32List queryFloat32Embedding = Float32List.fromList(
+      rawQueryEmbedding,
+    );
 
     final relevantChunks = await vectorDbService.searchSimilarChunks(
       queryFloat32Embedding,
@@ -139,7 +155,10 @@ class RagRepositoryImpl implements RagRepository {
     final context = relevantChunks.map((c) => c.content).join("\n---\n");
 
     return """
-Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en la documentación y los plugins provistos en el contexto. Si encuentras código relevante o patrones de arquitectura en el contexto, úsalos para armar un ejemplo práctico.
+Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en 
+la documentación y los plugins provistos en el contexto. Si encuentras
+código relevante o patrones de arquitectura en el contexto, úsalos para
+armar un ejemplo práctico.
 
 [Contexto de Agent Skills]
 $context
@@ -167,7 +186,9 @@ Respuesta en formato Markdown (usa bloques de código si es necesario):
     final List<String> sections = [];
     for (int i = 0; i < positions.length; i++) {
       final int start = positions[i];
-      final int end = (i + 1 < positions.length) ? positions[i + 1] : text.length;
+      final int end = (i + 1 < positions.length)
+          ? positions[i + 1]
+          : text.length;
       sections.add(text.substring(start, end));
     }
     return sections;

@@ -1,0 +1,30 @@
+name: clayton_agent
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  dio: ^5.11.1
+  file_picker: ^13.1.0
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.1
+  flutter_markdown: ^0.7.7+1
+  get_it: ^9.3.0
+  markdown: ^7.3.1
+  objectbox: ^5.3.2
+  objectbox_flutter_libs: ^5.3.2
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.1
+  objectbox_generator: ^5.3.2
+
+flutter:
+  uses-material-design: true

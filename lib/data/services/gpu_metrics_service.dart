@@ -1,7 +1,8 @@
 import 'dart:io';
+import 'dart:async';
 
 abstract class GpuMetricsService {
-  Future<int> getGpuUsagePercent();
+  Stream<int> getGpuUsageStream({Duration interval});
 }
 
 class GpuMetricsServiceImpl implements GpuMetricsService {
@@ -15,7 +16,18 @@ class GpuMetricsServiceImpl implements GpuMetricsService {
   ];
 
   @override
-  Future<int> getGpuUsagePercent() async {
+  Stream<int> getGpuUsageStream({
+    Duration interval = const Duration(milliseconds: 500),
+  }) {
+    // Cria um stream que roda periodicamente com base no intervalo definido
+    return Stream.periodic(
+      interval,
+      (_) => _readGpuNow(),
+    ).asyncMap((event) => event); // Transforma o Future em valor real no stream
+  }
+
+  /// Método auxiliar interno para fazer a leitura síncrona/assíncrona instantânea
+  Future<int> _readGpuNow() async {
     try {
       if (overridePath != null) {
         return await _readFromPath(overridePath!);
@@ -24,8 +36,7 @@ class GpuMetricsServiceImpl implements GpuMetricsService {
       for (final path in _candidateSysfsPaths) {
         final file = File(path);
         if (await file.exists()) {
-          final value = await _readFromPath(path);
-          return value;
+          return await _readFromPath(path);
         }
       }
       return 0;
@@ -35,11 +46,18 @@ class GpuMetricsServiceImpl implements GpuMetricsService {
   }
 
   Future<int> _readFromPath(String path) async {
-    final file = File(path);
-    if (!await file.exists()) return 0;
+    try {
+      final file = File(path);
+      final lines = await file.readAsLines();
+      if (lines.isEmpty) return 0;
 
-    final content = await file.readAsString();
-    final parsed = int.tryParse(content.trim()) ?? 0;
-    return parsed.clamp(0, 100);
+      final content = lines.first.trim();
+      final parsed = int.tryParse(content) ?? 0;
+
+      return parsed.clamp(0, 100);
+    } catch (e) {
+      print('Erro ao ler caminho da GPU ($path): $e');
+      return 0;
+    }
   }
 }

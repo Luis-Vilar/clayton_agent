@@ -20,10 +20,17 @@ abstract class RagRepository {
 class RagRepositoryImpl implements RagRepository {
   final OllamaService ollamaService;
   final VectorDbService vectorDbService;
+  final String? prompt;
 
   RagRepositoryImpl({
     required this.ollamaService,
     required this.vectorDbService,
+    this.prompt = """
+  Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en
+  la documentación y los plugins provistos en el contexto. Si encuentras
+  código relevante o patrones de arquitectura en el contexto, úsalos para
+  armar un ejemplo práctico.
+""",
   });
 
   @override
@@ -155,10 +162,7 @@ class RagRepositoryImpl implements RagRepository {
     final context = relevantChunks.map((c) => c.content).join("\n---\n");
 
     return """
-Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en 
-la documentación y los plugins provistos en el contexto. Si encuentras
-código relevante o patrones de arquitectura en el contexto, úsalos para
-armar un ejemplo práctico.
+$prompt
 
 [Contexto de Agent Skills]
 $context

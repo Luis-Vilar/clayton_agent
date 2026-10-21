@@ -5,6 +5,7 @@ import '../models/markdown_chunk.dart';
 
 abstract class VectorDbService {
   Future<int> getAllChunksCount();
+  Future<List<String>> getDistinctFileNames();
 
   Future<void> saveChunks(List<MarkdownChunk> chunks);
   Future<List<MarkdownChunk>> searchSimilarChunks(
@@ -53,6 +54,21 @@ class VectorDbServiceImpl implements VectorDbService {
   Future<int> getAllChunksCount() async {
     return _box
         .count(); // Devuelve la cantidad física de registros guardados en Linux
+  }
+
+  @override
+  Future<List<String>> getDistinctFileNames() async {
+    final all = _box.getAll();
+    final names = <String>{};
+    for (final chunk in all) {
+      if (chunk.filePath.isNotEmpty) {
+        final name = chunk.filePath.split('/').last;
+        if (name.isNotEmpty) {
+          names.add(name);
+        }
+      }
+    }
+    return names.toList();
   }
 
   @override

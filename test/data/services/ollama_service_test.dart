@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clayton_agent/data/models/ollama_stream_chunk.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
 
 class FakeStreamAdapter implements HttpClientAdapter {

@@ -18,14 +18,13 @@ abstract class RagRepository {
 }
 
 class RagRepositoryImpl implements RagRepository {
-  final OllamaService _ollamaService;
-  final VectorDbService _vectorDbService;
+  final OllamaService ollamaService;
+  final VectorDbService vectorDbService;
 
   RagRepositoryImpl({
-    required OllamaService ollamaService,
-    required VectorDbService vectorDbService,
-  })  : _ollamaService = ollamaService,
-        _vectorDbService = vectorDbService;
+    required this.ollamaService,
+    required this.vectorDbService,
+  });
 
   @override
   Future<List<String>> ingestFiles(List<String> filePaths) async {
@@ -47,7 +46,7 @@ class RagRepositoryImpl implements RagRepository {
           continue;
         }
 
-        final rawEmbedding = await _ollamaService.getEmbedding(section);
+        final rawEmbedding = await ollamaService.getEmbedding(section);
         final float32Embedding = Float32List.fromList(rawEmbedding);
 
         chunksToSave.add(
@@ -62,7 +61,7 @@ class RagRepositoryImpl implements RagRepository {
     }
 
     if (chunksToSave.isNotEmpty) {
-      await _vectorDbService.saveChunks(chunksToSave);
+      await vectorDbService.saveChunks(chunksToSave);
     }
 
     return processedFileNames.toList();
@@ -89,7 +88,7 @@ class RagRepositoryImpl implements RagRepository {
 
   @override
   Future<List<String>> getIngestedFileNames() async {
-    return await _vectorDbService.getDistinctFileNames();
+    return await vectorDbService.getDistinctFileNames();
   }
 
   @override
@@ -98,7 +97,7 @@ class RagRepositoryImpl implements RagRepository {
     if (prompt == null) {
       return "No dispongo de información o patrones de diseño en mis documentos indexados para responder a esta consulta.";
     }
-    return await _ollamaService.generateResponse(prompt);
+    return await ollamaService.generateResponse(prompt);
   }
 
   @override
@@ -113,7 +112,7 @@ class RagRepositoryImpl implements RagRepository {
       return;
     }
 
-    final stream = _ollamaService.generateResponseStream(prompt);
+    final stream = ollamaService.generateResponseStream(prompt);
     await for (final chunk in stream) {
       yield RagStreamUpdate(
         chunk: chunk.text,
@@ -125,10 +124,10 @@ class RagRepositoryImpl implements RagRepository {
   }
 
   Future<String?> _buildPromptForQuestion(String question) async {
-    final List<double> rawQueryEmbedding = await _ollamaService.getEmbedding(question);
+    final List<double> rawQueryEmbedding = await ollamaService.getEmbedding(question);
     final Float32List queryFloat32Embedding = Float32List.fromList(rawQueryEmbedding);
 
-    final relevantChunks = await _vectorDbService.searchSimilarChunks(
+    final relevantChunks = await vectorDbService.searchSimilarChunks(
       queryFloat32Embedding,
       4,
     );
@@ -176,6 +175,6 @@ Respuesta en formato Markdown (usa bloques de código si es necesario):
 
   @override
   Future<void> clearKnowledgeBase() async {
-    await _vectorDbService.clearAllChunks();
+    await vectorDbService.clearAllChunks();
   }
 }

@@ -5,7 +5,6 @@ import 'package:clayton_agent/data/models/markdown_chunk.dart';
 import 'package:clayton_agent/data/models/ollama_stream_chunk.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
 import 'package:clayton_agent/data/services/vector_db_service.dart';
-import 'package:clayton_agent/domain/models/rag_stream_update.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
 
 class MockOllamaService implements OllamaService {

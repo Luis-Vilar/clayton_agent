@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../blocs/rag_bloc.dart';
+import '../widgets/telemetry_badge.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -14,23 +15,61 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _questionController = TextEditingController();
-  final List<Map<String, String>> _messages =
-      []; // Historial visual local del chat
-  final List<String> _ingestedFiles = []; // Lista de archivos aprendidos
+  final ScrollController _scrollController = ScrollController();
+
+  final List<Map<String, String>> _messages = [];
+  final List<String> _ingestedFiles = [];
+
+  double _currentTps = 0.0;
+  int _gpuUsage = 0;
+  bool _isGenerating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RagBloc>().add(LoadIngestedFilesEvent());
+    });
+  }
 
   @override
   void dispose() {
     _questionController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  // Abre el selector nativo de archivos de Linux (GNOME/KDE) filtrando por Markdown
-  Future<void> _pickSkillsDirectory(BuildContext context) async {
-    // Abre el explorador de Linux en modo selección de directorios
-    String? selectedDirectory = await FilePicker.getDirectoryPath();
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
-    if (selectedDirectory != null) {
-      // Apunta directamente a la carpeta que contiene las subcarpetas del npx skills
+  Future<void> _pickMarkdownFiles(BuildContext context) async {
+    final pickedFiles = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['md', 'markdown'],
+    );
+
+    if (pickedFiles.isNotEmpty) {
+      final validPaths =
+          pickedFiles.map((f) => f.path).whereType<String>().toList();
+      if (validPaths.isNotEmpty && context.mounted) {
+        context.read<RagBloc>().add(IngestMarkdownFilesEvent(validPaths));
+      }
+    }
+  }
+
+  Future<void> _pickSkillsDirectory(BuildContext context) async {
+    final selectedDirectory = await FilePicker.getDirectoryPath();
+
+    if (selectedDirectory != null && context.mounted) {
       context.read<RagBloc>().add(
         IngestSkillsDirectoryEvent(selectedDirectory),
       );
@@ -39,26 +78,31 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendQuestion(BuildContext context) {
     final question = _questionController.text.trim();
-    if (question.isEmpty) return;
+    if (question.isEmpty || _isGenerating) return;
 
     setState(() {
       _messages.add({'role': 'user', 'text': question});
+      _isGenerating = true;
     });
 
     context.read<RagBloc>().add(SendQuestionEvent(question));
     _questionController.clear();
+    _scrollToBottom();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       body: BlocListener<RagBloc, RagState>(
         listener: (context, state) {
           if (state is KnowledgeBaseClearedState) {
             setState(() {
-              _ingestedFiles
-                  .clear(); // Vacía la lista visual de archivos indexados
-              _messages.clear(); // Opcional: limpia el chat actual
+              _ingestedFiles.clear();
+              _messages.clear();
+              _currentTps = 0.0;
+              _isGenerating = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -67,23 +111,59 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             );
-          }
-          if (state is FileIngestedSuccessState) {
+          } else if (state is FileIngestedSuccessState) {
             setState(() {
-              _ingestedFiles.add(state.fileName);
+              for (final name in state.fileNames) {
+                if (!_ingestedFiles.contains(name)) {
+                  _ingestedFiles.add(name);
+                }
+              }
             });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  '✅ Archivo "${state.fileName}" indexado con éxito.',
+                  '✅ ${state.fileNames.length} archivo(s) indexado(s) con éxito.',
                 ),
               ),
             );
+          } else if (state is RagLoadedFilesState) {
+            setState(() {
+              _ingestedFiles.clear();
+              _ingestedFiles.addAll(state.fileNames);
+            });
+          } else if (state is RagStreamingState) {
+            setState(() {
+              _currentTps = state.currentTps;
+              _gpuUsage = state.gpuUsagePercent;
+              _isGenerating = true;
+
+              if (_messages.isNotEmpty && _messages.last['role'] == 'assistant') {
+                _messages.last['text'] = state.accumulatedAnswer;
+              } else {
+                _messages.add({
+                  'role': 'assistant',
+                  'text': state.accumulatedAnswer,
+                });
+              }
+            });
+            _scrollToBottom();
           } else if (state is RagResponseSuccessState) {
             setState(() {
-              _messages.add({'role': 'assistant', 'text': state.answer});
+              _currentTps = state.finalTps;
+              _gpuUsage = state.gpuUsagePercent;
+              _isGenerating = false;
+
+              if (_messages.isNotEmpty && _messages.last['role'] == 'assistant') {
+                _messages.last['text'] = state.answer;
+              } else {
+                _messages.add({'role': 'assistant', 'text': state.answer});
+              }
             });
+            _scrollToBottom();
           } else if (state is RagErrorState) {
+            setState(() {
+              _isGenerating = false;
+            });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('❌ Error: ${state.errorMessage}'),
@@ -96,9 +176,8 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             // PANEL LATERAL IZQUIERDO: Control de Archivos Markdown
             Container(
-              width: 280,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.4),
+              width: 290,
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,50 +188,65 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
-                    onPressed: () {
-                      // Disparar evento de borrado al Bloc
-                      context.read<RagBloc>().add(ClearKnowledgeBaseEvent());
-                    },
+                    onPressed: _isGenerating
+                        ? null
+                        : () {
+                            context.read<RagBloc>().add(ClearKnowledgeBaseEvent());
+                          },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.redAccent,
                       side: const BorderSide(color: Colors.redAccent),
                     ),
-                    icon: const Icon(Icons.delete_sweep),
+                    icon: const Icon(Icons.delete_sweep, size: 18),
                     label: const Text('Limpiar Base de Datos'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => _pickSkillsDirectory(context),
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Importar Markdown'),
+                    onPressed: _isGenerating ? null : () => _pickMarkdownFiles(context),
+                    icon: const Icon(Icons.note_add, size: 18),
+                    label: const Text('Subir Archivo(s)'),
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Documentos Indexados:',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _isGenerating ? null : () => _pickSkillsDirectory(context),
+                    icon: const Icon(Icons.folder_open, size: 18),
+                    label: const Text('Subir Carpeta'),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Documentos Indexados (${_ingestedFiles.length}):',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
                     child: _ingestedFiles.isEmpty
                         ? const Center(
                             child: Text(
-                              'No hay documentos cargados.',
+                              'No hay documentos cargados.\nAgrega archivos .md o carpetas.',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.grey,
-                                fontSize: 13,
+                                fontSize: 12,
                               ),
                             ),
                           )
-                        : ListView.builder(
+                        : ListView.separated(
                             itemCount: _ingestedFiles.length,
+                            separatorBuilder: (context, _) => const Divider(height: 1),
                             itemBuilder: (context, index) => ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               leading: const Icon(
                                 Icons.article,
-                                color: Colors.blue,
+                                color: Colors.blueAccent,
+                                size: 20,
                               ),
                               title: Text(
                                 _ingestedFiles[index],
-                                style: const TextStyle(fontSize: 13),
+                                style: const TextStyle(fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -162,7 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-            // SECCIÓN PRINCIPAL DERECHA: Chat Técnico RAG
+            // SECCIÓN PRINCIPAL DERECHA: Chat Técnico RAG y Telemetría
             Expanded(
               child: Column(
                 children: [
@@ -176,6 +270,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           )
                         : ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.all(16.0),
                             itemCount: _messages.length,
                             itemBuilder: (context, index) {
@@ -186,25 +281,24 @@ class _ChatScreenState extends State<ChatScreen> {
                                     ? Alignment.centerRight
                                     : Alignment.centerLeft,
                                 child: Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.55,
+                                  width: MediaQuery.of(context).size.width * 0.58,
                                   margin: const EdgeInsets.symmetric(
                                     vertical: 8.0,
                                   ),
                                   padding: const EdgeInsets.all(14.0),
                                   decoration: BoxDecoration(
                                     color: isUser
-                                        ? Theme.of(context)
-                                              .colorScheme
-                                              .primaryContainer
-                                        : Theme.of(context)
-                                              .colorScheme
-                                              .surfaceContainerLow,
+                                        ? theme.colorScheme.primaryContainer
+                                        : theme.colorScheme.surfaceContainerLow,
                                     borderRadius: BorderRadius.circular(12.0),
                                   ),
-                                  // RENDERIZADO VISUAL DEL MARKDOWN
                                   child: isUser
-                                      ? Text(msg['text'] ?? '')
+                                      ? Text(
+                                          msg['text'] ?? '',
+                                          style: TextStyle(
+                                            color: theme.colorScheme.onPrimaryContainer,
+                                          ),
+                                        )
                                       : MarkdownBody(
                                           data: msg['text'] ?? '',
                                           selectable: true,
@@ -220,22 +314,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     builder: (context, state) {
                       if (state is RagLoadingState) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          padding: const EdgeInsets.symmetric(vertical: 6.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Text(
                                 state.message,
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   color: Colors.grey,
                                 ),
                               ),
@@ -249,29 +341,58 @@ class _ChatScreenState extends State<ChatScreen> {
 
                   // Barra inferior de entrada de texto
                   Container(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     decoration: BoxDecoration(
                       border: Border(
-                        top: BorderSide(color: Theme.of(context).dividerColor),
+                        top: BorderSide(color: theme.dividerColor),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _questionController,
-                            decoration: const InputDecoration(
-                              hintText: 'Pregúntale al modelo sobre el contexto indexado...',
-                              border: OutlineInputBorder(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _questionController,
+                                decoration: const InputDecoration(
+                                  hintText:
+                                      'Pregúntale al modelo sobre el contexto indexado...',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onSubmitted: (_) => _sendQuestion(context),
+                              ),
                             ),
-                            onSubmitted: (_) => _sendQuestion(context),
-                          ),
+                            const SizedBox(width: 12),
+                            IconButton.filled(
+                              icon: _isGenerating
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.send),
+                              onPressed: _isGenerating
+                                  ? null
+                                  : () => _sendQuestion(context),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          icon: const Icon(Icons.send),
-                          onPressed: () => _sendQuestion(context),
-                          color: Theme.of(context).colorScheme.primary,
+                        const SizedBox(height: 8),
+                        // Barra fija inferior derecha con métricas de hardware y tokens
+                        Row(
+                          children: [
+                            const Spacer(),
+                            TelemetryBadge(
+                              tokensPerSecond: _currentTps,
+                              gpuUsagePercent: _gpuUsage,
+                              isGenerating: _isGenerating,
+                            ),
+                          ],
                         ),
                       ],
                     ),

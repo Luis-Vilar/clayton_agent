@@ -8,15 +8,13 @@ part 'rag_event.dart';
 part 'rag_state.dart';
 
 class RagBloc extends Bloc<RagEvent, RagState> {
-  final RagRepository _repository;
-  final GpuMetricsService _gpuMetricsService;
+  final RagRepository repository;
+  final GpuMetricsService gpuMetricsService;
 
   RagBloc({
-    required RagRepository repository,
-    required GpuMetricsService gpuMetricsService,
-  })  : _repository = repository,
-        _gpuMetricsService = gpuMetricsService,
-        super(RagInitialState()) {
+    required this.repository,
+    required this.gpuMetricsService,
+  }) : super(RagInitialState()) {
     on<IngestSkillsDirectoryEvent>(_onIngestSkillsDirectory);
     on<IngestMarkdownFilesEvent>(_onIngestMarkdownFiles);
     on<LoadIngestedFilesEvent>(_onLoadIngestedFiles);
@@ -35,7 +33,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
     );
     try {
       final fileNames =
-          await _repository.ingestAgentSkillsDirectory(event.directoryPath);
+          await repository.ingestAgentSkillsDirectory(event.directoryPath);
       emit(FileIngestedSuccessState(fileNames));
     } catch (e) {
       emit(RagErrorState("Error al procesar las carpetas: ${e.toString()}"));
@@ -52,7 +50,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
       ),
     );
     try {
-      final fileNames = await _repository.ingestFiles(event.filePaths);
+      final fileNames = await repository.ingestFiles(event.filePaths);
       emit(FileIngestedSuccessState(fileNames));
     } catch (e) {
       emit(RagErrorState("Error al procesar los archivos: ${e.toString()}"));
@@ -64,7 +62,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
     Emitter<RagState> emit,
   ) async {
     try {
-      final fileNames = await _repository.getIngestedFileNames();
+      final fileNames = await repository.getIngestedFileNames();
       emit(RagLoadedFilesState(fileNames));
     } catch (e) {
       emit(RagErrorState("Error al cargar archivos indexados: ${e.toString()}"));
@@ -81,12 +79,12 @@ class RagBloc extends Bloc<RagEvent, RagState> {
       ),
     );
     try {
-      final currentGpu = await _gpuMetricsService.getGpuUsagePercent();
+      final currentGpu = await gpuMetricsService.getGpuUsagePercent();
       final buffer = StringBuffer();
       double lastTps = 0.0;
 
       await emit.forEach<RagStreamUpdate>(
-        _repository.askQuestionStream(event.question),
+        repository.askQuestionStream(event.question),
         onData: (update) {
           buffer.write(update.chunk);
           if (update.tokensPerSecond > 0) {
@@ -123,7 +121,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
   ) async {
     emit(RagLoadingState("Vaciando base de datos vectorial local..."));
     try {
-      await _repository.clearKnowledgeBase();
+      await repository.clearKnowledgeBase();
       emit(KnowledgeBaseClearedState());
     } catch (e) {
       emit(RagErrorState("Error al limpiar la base de datos: ${e.toString()}"));

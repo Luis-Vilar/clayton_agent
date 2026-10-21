@@ -1,3 +1,4 @@
+import 'package:clayton_agent/data/services/gpu_metrics_service.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
 import 'package:clayton_agent/data/services/vector_db_service.dart';
 import 'package:clayton_agent/data/services/vector_store_initializer.dart';
@@ -32,6 +33,9 @@ Future<void> initDependencies() async {
   getIt.registerSingleton<Store>(store);
 
   // 3. Servicios (Data Source)
+  getIt.registerLazySingleton<GpuMetricsService>(
+    () => GpuMetricsServiceImpl(),
+  );
   getIt.registerLazySingleton<OllamaService>(
     () => OllamaServiceImpl(dio: getIt()),
   );

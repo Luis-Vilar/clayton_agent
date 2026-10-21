@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import '../models/ollama_stream_chunk.dart';
 
 abstract class OllamaService {
   Future<List<double>> getEmbedding(String text);
   Future<String> generateResponse(String prompt);
+  Stream<OllamaStreamChunk> generateResponseStream(String prompt);
 }
 
 class OllamaServiceImpl implements OllamaService {
@@ -56,6 +59,72 @@ class OllamaServiceImpl implements OllamaService {
       throw Exception('Error al generar respuesta de Ollama');
     } catch (e) {
       throw Exception('Fallo al generar respuesta: $e');
+    }
+  }
+
+  @override
+  Stream<OllamaStreamChunk> generateResponseStream(String prompt) async* {
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '/generate',
+        data: {
+          'model': llmModel,
+          'prompt': prompt,
+          'stream': true,
+        },
+        options: Options(responseType: ResponseType.stream),
+      );
+
+      final responseBody = response.data;
+      if (responseBody == null) {
+        throw Exception('Cuerpo de respuesta vacío desde Ollama');
+      }
+
+      final stopwatch = Stopwatch()..start();
+      int tokenCounter = 0;
+
+      final lineStream = responseBody.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in lineStream) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+
+        final Map<String, dynamic> data =
+            jsonDecode(trimmed) as Map<String, dynamic>;
+        final String text = (data['response'] as String?) ?? '';
+        final bool isDone = (data['done'] as bool?) ?? false;
+
+        tokenCounter++;
+        double currentTps = 0.0;
+
+        final int? evalCount = data['eval_count'] as int?;
+        final int? evalDuration = data['eval_duration'] as int?;
+
+        if (isDone &&
+            evalCount != null &&
+            evalDuration != null &&
+            evalDuration > 0) {
+          currentTps = evalCount / (evalDuration / 1e9);
+        } else {
+          final elapsedSeconds = stopwatch.elapsedMicroseconds / 1e6;
+          if (elapsedSeconds > 0) {
+            currentTps = tokenCounter / elapsedSeconds;
+          }
+        }
+
+        yield OllamaStreamChunk(
+          text: text,
+          isDone: isDone,
+          tokensPerSecond: currentTps.isNaN || currentTps.isInfinite ? 0.0 : currentTps,
+          evalCount: evalCount,
+          evalDurationNano: evalDuration,
+        );
+      }
+    } catch (e) {
+      throw Exception('Fallo en el streaming de Ollama: $e');
     }
   }
 }

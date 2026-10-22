@@ -4,10 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:clayton_agent/data/models/markdown_chunk.dart';
 import 'package:clayton_agent/data/models/ollama_stream_chunk.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
+import 'package:clayton_agent/data/services/prompt_settings_service.dart';
 import 'package:clayton_agent/data/services/vector_db_service.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
 
 class MockOllamaService implements OllamaService {
+  String? lastPrompt;
+
   @override
   Future<List<double>> getEmbedding(String text) async {
     return List.filled(768, 0.1);
@@ -15,13 +18,29 @@ class MockOllamaService implements OllamaService {
 
   @override
   Future<String> generateResponse(String prompt) async {
+    lastPrompt = prompt;
     return "Respuesta simulada";
   }
 
   @override
   Stream<OllamaStreamChunk> generateResponseStream(String prompt) async* {
+    lastPrompt = prompt;
     yield OllamaStreamChunk(text: "Respuesta", isDone: false, tokensPerSecond: 10.0);
     yield OllamaStreamChunk(text: " en stream", isDone: true, tokensPerSecond: 20.0, evalCount: 15);
+  }
+}
+
+class FakePromptSettingsService implements PromptSettingsService {
+  String role = defaultAgentRole;
+  bool failOnSave = false;
+
+  @override
+  Future<String> loadAgentRole() async => role;
+
+  @override
+  Future<void> saveAgentRole(String role) async {
+    if (failOnSave) throw Exception('save failed');
+    this.role = role;
   }
 }
 
@@ -53,14 +72,18 @@ class MockVectorDbService implements VectorDbService {
 void main() {
   late MockOllamaService mockOllama;
   late MockVectorDbService mockVectorDb;
+  late FakePromptSettingsService fakeSettings;
   late RagRepositoryImpl repository;
 
   setUp(() {
     mockOllama = MockOllamaService();
     mockVectorDb = MockVectorDbService();
+    fakeSettings = FakePromptSettingsService();
     repository = RagRepositoryImpl(
       ollamaService: mockOllama,
       vectorDbService: mockVectorDb,
+      promptSettingsService: fakeSettings,
+      initialAgentRole: defaultAgentRole,
     );
   });
 
@@ -115,6 +138,37 @@ Este parrafo tiene bastante texto descriptivo para ser indexado por el repositor
       expect(updates[1].chunk, equals(' en stream'));
       expect(updates[1].isDone, isTrue);
       expect(updates[1].tokensPerSecond, equals(20.0));
+    });
+
+    test('updateAgentRole persists and uses the new role in the next prompt', () async {
+      mockVectorDb.stored.add(
+        MarkdownChunk(
+          filePath: '/path/doc.md',
+          skillName: 'general',
+          content: 'Contexto relevante sobre SQL',
+          embedding: Float32List(768),
+        ),
+      );
+
+      await repository.updateAgentRole('Eres un experto en SQL.');
+
+      expect(repository.agentRole, 'Eres un experto en SQL.');
+      expect(fakeSettings.role, 'Eres un experto en SQL.');
+
+      await repository.askQuestionStream('¿Qué es un índice?').toList();
+
+      expect(mockOllama.lastPrompt, contains('Eres un experto en SQL.'));
+      expect(mockOllama.lastPrompt, isNot(contains('Dart/Flutter')));
+    });
+
+    test('updateAgentRole does not change the role when persistence fails', () async {
+      fakeSettings.failOnSave = true;
+
+      await expectLater(
+        repository.updateAgentRole('Rol nuevo'),
+        throwsA(isA<Exception>()),
+      );
+      expect(repository.agentRole, defaultAgentRole);
     });
   });
 }

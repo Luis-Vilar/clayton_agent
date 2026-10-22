@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:clayton_agent/data/models/markdown_chunk.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
+import 'package:clayton_agent/data/services/prompt_settings_service.dart';
 import 'package:clayton_agent/data/services/vector_db_service.dart';
 import 'package:path/path.dart' as p;
 
@@ -15,23 +16,31 @@ abstract class RagRepository {
   Future<String> askQuestion(String question);
   Stream<RagStreamUpdate> askQuestionStream(String question);
   Future<void> clearKnowledgeBase();
+  String get agentRole;
+  Future<void> updateAgentRole(String role);
 }
 
 class RagRepositoryImpl implements RagRepository {
   final OllamaService ollamaService;
   final VectorDbService vectorDbService;
-  final String? prompt;
+  final PromptSettingsService promptSettingsService;
+  String _agentRole;
 
   RagRepositoryImpl({
     required this.ollamaService,
     required this.vectorDbService,
-    this.prompt = """
-  Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en
-  la documentación y los plugins provistos en el contexto. Si encuentras
-  código relevante o patrones de arquitectura en el contexto, úsalos para
-  armar un ejemplo práctico.
-""",
-  });
+    required this.promptSettingsService,
+    required String initialAgentRole,
+  }) : _agentRole = initialAgentRole;
+
+  @override
+  String get agentRole => _agentRole;
+
+  @override
+  Future<void> updateAgentRole(String role) async {
+    await promptSettingsService.saveAgentRole(role);
+    _agentRole = role;
+  }
 
   @override
   Future<List<String>> ingestFiles(List<String> filePaths) async {
@@ -149,7 +158,6 @@ class RagRepositoryImpl implements RagRepository {
     final Float32List queryFloat32Embedding = Float32List.fromList(
       rawQueryEmbedding,
     );
-
     final relevantChunks = await vectorDbService.searchSimilarChunks(
       queryFloat32Embedding,
       4,
@@ -162,7 +170,7 @@ class RagRepositoryImpl implements RagRepository {
     final context = relevantChunks.map((c) => c.content).join("\n---\n");
 
     return """
-$prompt
+$_agentRole
 
 [Contexto de Agent Skills]
 $context

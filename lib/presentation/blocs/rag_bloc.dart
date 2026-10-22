@@ -18,6 +18,8 @@ class RagBloc extends Bloc<RagEvent, RagState> {
     on<LoadIngestedFilesEvent>(_onLoadIngestedFiles);
     on<SendQuestionEvent>(_onSendQuestion);
     on<ClearKnowledgeBaseEvent>(_onClearKnowledgeBase);
+    on<LoadAgentRoleEvent>(_onLoadAgentRole);
+    on<UpdateAgentRoleEvent>(_onUpdateAgentRole);
   }
 
   Future<void> _onIngestSkillsDirectory(
@@ -203,6 +205,22 @@ class RagBloc extends Bloc<RagEvent, RagState> {
       emit(KnowledgeBaseClearedState());
     } catch (e) {
       emit(RagErrorState("Error al limpiar la base de datos: ${e.toString()}"));
+    }
+  }
+
+  void _onLoadAgentRole(LoadAgentRoleEvent event, Emitter<RagState> emit) {
+    emit(AgentRoleLoadedState(repository.agentRole));
+  }
+
+  Future<void> _onUpdateAgentRole(
+    UpdateAgentRoleEvent event,
+    Emitter<RagState> emit,
+  ) async {
+    try {
+      await repository.updateAgentRole(event.role);
+      emit(AgentRoleUpdatedState(event.role));
+    } catch (e) {
+      emit(RagErrorState("Error al guardar el rol del agente: ${e.toString()}"));
     }
   }
 }

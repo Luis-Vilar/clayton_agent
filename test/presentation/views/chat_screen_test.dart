@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,8 +35,9 @@ class MockRagRepository implements RagRepository {
   Future<List<String>> getIngestedFileNames() async => ['habilidad.md'];
 
   @override
-  Future<List<String>> ingestAgentSkillsDirectory(String baseDirectoryPath) async =>
-      [];
+  Future<List<String>> ingestAgentSkillsDirectory(
+    String baseDirectoryPath,
+  ) async => [];
 
   @override
   Future<List<String>> ingestFiles(List<String> filePaths) async => [];
@@ -43,64 +45,63 @@ class MockRagRepository implements RagRepository {
 
 class MockGpuMetricsService implements GpuMetricsService {
   @override
-  Future<int> getGpuUsagePercent() async => 25;
+  Stream<int> getGpuUsageStream({
+    Duration interval = const Duration(microseconds: 1),
+  }) => Stream.value(50);
 }
 
 void main() {
-  testWidgets('ChatScreen handles rapid streaming updates without freezing or crashing', (
-    WidgetTester tester,
-  ) async {
-    final mockRepo = MockRagRepository();
-    final mockGpu = MockGpuMetricsService();
-    final bloc = RagBloc(repository: mockRepo, gpuMetricsService: mockGpu);
+  testWidgets(
+    'ChatScreen handles rapid streaming updates without freezing or crashing',
+    (WidgetTester tester) async {
+      final mockRepo = MockRagRepository();
+      final mockGpu = MockGpuMetricsService();
+      final bloc = RagBloc(repository: mockRepo, gpuMetricsService: mockGpu);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider<RagBloc>.value(
-          value: bloc,
-          child: const ChatScreen(),
-        ),
-      ),
-    );
-
-    // Initial frame
-    await tester.pumpAndSettle();
-    expect(find.text('Conocimiento Local'), findsOneWidget);
-    expect(find.text('habilidad.md'), findsOneWidget);
-
-    // Type a question and send
-    await tester.enterText(find.byType(TextField), '¿Qué es Flutter?');
-    await tester.tap(find.byType(IconButton));
-    await tester.pump();
-
-    // Stream 15 fast chunks simulating Ollama tokens
-    for (int i = 1; i <= 15; i++) {
-      mockRepo.pushUpdate(
-        RagStreamUpdate(
-          chunk: 'Token$i ',
-          isDone: false,
-          tokensPerSecond: 40.0,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider<RagBloc>.value(
+            value: bloc,
+            child: const ChatScreen(),
+          ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 25));
-    }
 
-    // Emit final done chunk
-    mockRepo.pushUpdate(
-      RagStreamUpdate(
-        chunk: 'Final.',
-        isDone: true,
-        tokensPerSecond: 40.0,
-      ),
-    );
-    mockRepo.complete();
+      // Initial frame
+      await tester.pumpAndSettle();
+      expect(find.text('Conocimiento Local'), findsOneWidget);
+      expect(find.text('habilidad.md'), findsOneWidget);
 
-    await tester.pumpAndSettle();
+      // Type a question and send
+      await tester.enterText(find.byType(TextField), '¿Qué es Flutter?');
+      await tester.tap(find.byType(IconButton));
+      await tester.pump();
 
-    // Verify rendered content contains all tokens without exceptions
-    expect(find.textContaining('Token1'), findsWidgets);
-    expect(find.textContaining('Final.'), findsWidgets);
+      // Stream 15 fast chunks simulating Ollama tokens
+      for (int i = 1; i <= 15; i++) {
+        mockRepo.pushUpdate(
+          RagStreamUpdate(
+            chunk: 'Token$i ',
+            isDone: false,
+            tokensPerSecond: 40.0,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 25));
+      }
 
-    bloc.close();
-  });
+      // Emit final done chunk
+      mockRepo.pushUpdate(
+        RagStreamUpdate(chunk: 'Final.', isDone: true, tokensPerSecond: 40.0),
+      );
+      mockRepo.complete();
+
+      await tester.pumpAndSettle();
+
+      // Verify rendered content contains all tokens without exceptions
+      expect(find.textContaining('Token1'), findsWidgets);
+      expect(find.textContaining('Final.'), findsWidgets);
+
+      bloc.close();
+    },
+  );
 }

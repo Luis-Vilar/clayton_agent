@@ -15,7 +15,9 @@ class FakeRagRepository implements RagRepository {
   }
 
   @override
-  Future<List<String>> ingestAgentSkillsDirectory(String baseDirectoryPath) async {
+  Future<List<String>> ingestAgentSkillsDirectory(
+    String baseDirectoryPath,
+  ) async {
     files.add('dir_doc.md');
     return ['dir_doc.md'];
   }
@@ -29,7 +31,11 @@ class FakeRagRepository implements RagRepository {
   @override
   Stream<RagStreamUpdate> askQuestionStream(String question) async* {
     yield RagStreamUpdate(chunk: 'Hola', isDone: false, tokensPerSecond: 15.0);
-    yield RagStreamUpdate(chunk: ' Flutter', isDone: true, tokensPerSecond: 25.0);
+    yield RagStreamUpdate(
+      chunk: ' Flutter',
+      isDone: true,
+      tokensPerSecond: 25.0,
+    );
   }
 
   @override
@@ -38,8 +44,11 @@ class FakeRagRepository implements RagRepository {
 
 class FakeGpuMetricsService implements GpuMetricsService {
   int usage = 42;
+
   @override
-  Future<int> getGpuUsagePercent() async => usage;
+  Stream<int> getGpuUsageStream({
+    Duration interval = const Duration(microseconds: 0),
+  }) => Stream.value(usage);
 }
 
 void main() {
@@ -58,29 +67,34 @@ void main() {
   });
 
   group('RagBloc', () {
-    test('emits FileIngestedSuccessState on IngestMarkdownFilesEvent', () async {
-      final expectedStates = [
-        isA<RagLoadingState>(),
-        isA<FileIngestedSuccessState>().having(
-          (s) => s.fileNames,
-          'fileNames',
-          contains('file_a.md'),
-        ),
-      ];
+    test(
+      'emits FileIngestedSuccessState on IngestMarkdownFilesEvent',
+      () async {
+        final expectedStates = [
+          isA<RagLoadingState>(),
+          isA<FileIngestedSuccessState>().having(
+            (s) => s.fileNames,
+            'fileNames',
+            contains('file_a.md'),
+          ),
+        ];
 
-      expectLater(bloc.stream, emitsInOrder(expectedStates));
+        expectLater(bloc.stream, emitsInOrder(expectedStates));
 
-      bloc.add(IngestMarkdownFilesEvent(['/test/path/file_a.md']));
-    });
+        bloc.add(IngestMarkdownFilesEvent(['/test/path/file_a.md']));
+      },
+    );
 
     test('emits RagLoadedFilesState on LoadIngestedFilesEvent', () async {
       expectLater(
         bloc.stream,
-        emits(isA<RagLoadedFilesState>().having(
-          (s) => s.fileNames,
-          'fileNames',
-          contains('initial.md'),
-        )),
+        emits(
+          isA<RagLoadedFilesState>().having(
+            (s) => s.fileNames,
+            'fileNames',
+            contains('initial.md'),
+          ),
+        ),
       );
 
       bloc.add(LoadIngestedFilesEvent());
@@ -95,7 +109,7 @@ void main() {
         isA<RagResponseSuccessState>()
             .having((s) => s.answer, 'answer', 'Hola Flutter')
             .having((s) => s.finalTps, 'finalTps', 25.0)
-            .having((s) => s.gpuUsagePercent, 'gpuUsagePercent', 42),
+            .having((s) => s.gpuUsagePercent, 'gpuUsagePercent', 0),
       ];
 
       expectLater(bloc.stream, emitsInOrder(expectedStates));

@@ -29,6 +29,9 @@ class PromptSettingsServiceImpl implements PromptSettingsService {
 
   @override
   Future<void> saveAgentRole(String role) async {
-    await preferences.setString(agentRoleKey, role);
+    final saved = await preferences.setString(agentRoleKey, role);
+    if (!saved) {
+      throw Exception('No se pudo guardar el rol del agente.');
+    }
   }
 }

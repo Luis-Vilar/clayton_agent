@@ -31,15 +31,18 @@ class RagRepositoryImpl implements RagRepository {
     required this.vectorDbService,
     required this.promptSettingsService,
     required String initialAgentRole,
-  }) : _agentRole = initialAgentRole;
+  }) : _agentRole = initialAgentRole.trim().isEmpty
+           ? defaultAgentRole
+           : initialAgentRole;
 
   @override
   String get agentRole => _agentRole;
 
   @override
   Future<void> updateAgentRole(String role) async {
-    await promptSettingsService.saveAgentRole(role);
-    _agentRole = role;
+    final effectiveRole = role.trim().isEmpty ? defaultAgentRole : role;
+    await promptSettingsService.saveAgentRole(effectiveRole);
+    _agentRole = effectiveRole;
   }
 
   @override

@@ -170,5 +170,36 @@ Este parrafo tiene bastante texto descriptivo para ser indexado por el repositor
       );
       expect(repository.agentRole, defaultAgentRole);
     });
+
+    test('updateAgentRole falls back to the default role for blank input', () async {
+      mockVectorDb.stored.add(
+        MarkdownChunk(
+          filePath: '/path/doc.md',
+          skillName: 'general',
+          content: 'Contexto relevante sobre SQL',
+          embedding: Float32List(768),
+        ),
+      );
+
+      await repository.updateAgentRole('   ');
+
+      expect(repository.agentRole, defaultAgentRole);
+      expect(fakeSettings.role, defaultAgentRole);
+
+      await repository.askQuestionStream('¿Qué es un índice?').toList();
+
+      expect(mockOllama.lastPrompt, contains('Dart/Flutter'));
+    });
+
+    test('constructor falls back to the default role for a blank initial role', () {
+      final blankRepository = RagRepositoryImpl(
+        ollamaService: mockOllama,
+        vectorDbService: mockVectorDb,
+        promptSettingsService: fakeSettings,
+        initialAgentRole: '   ',
+      );
+
+      expect(blankRepository.agentRole, defaultAgentRole);
+    });
   });
 }

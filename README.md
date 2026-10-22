@@ -18,6 +18,7 @@
 - **Base de datos vectorial embebida** — Usa [ObjectBox](https://objectbox.io/) con índice HNSW para búsqueda semántica ultrarrápida.
 - **Telemetría en vivo** — Muestra tokens/segundo y uso de GPU mientras el modelo genera.
 - **Ingesta flexible** — Soporta archivos `.md` individuales o carpetas completas de manera recursiva.
+- **Rol del agente personalizable** — Editable desde la UI y persistido localmente, para adaptar el agente a otros dominios además de Flutter.
 - **UI de escritorio nativa en Linux** — Construida con Flutter y Material Design 3.
 
 ---
@@ -31,14 +32,14 @@ lib/
 ├── core/           # Bootstrapping e inyección de dependencias (GetIt)
 ├── data/
 │   ├── models/     # MarkdownChunk (entidad ObjectBox + embedding vectorial)
-│   └── services/   # OllamaService, VectorDbService, GpuMetricsService
+│   └── services/   # OllamaService, VectorDbService, GpuMetricsService, PromptSettingsService
 ├── domain/
 │   ├── models/     # RagStreamUpdate
 │   └── repositories/ # RagRepository (lógica RAG: chunking, búsqueda, prompting)
 └── presentation/
     ├── blocs/      # RagBloc (flutter_bloc: eventos, estados, streaming)
     ├── views/      # ChatScreen (UI principal)
-    └── widgets/    # TelemetryBadge
+    └── widgets/    # AgentRoleDialog, TelemetryBadge
 ```
 
 ### Flujo RAG
@@ -57,7 +58,7 @@ Pregunta del usuario  →  Embedding  →  Búsqueda de vecinos más cercanos  �
 
 | Herramienta | Versión mínima |
 |-------------|---------------|
-| Flutter SDK | `^3.13.5` |
+| Flutter SDK | `3.47.6` |
 | Dart SDK | `^3.13.5` |
 | [Ollama](https://ollama.com) | Última estable |
 | Sistema operativo | Linux |
@@ -120,6 +121,7 @@ flutter run -d linux
 |--------|-------------|
 | **Subir Archivo(s)** | Abre un selector de archivos para indexar uno o varios `.md` |
 | **Subir Carpeta** | Recorre recursivamente un directorio e indexa todos los `.md` encontrados (ideal para carpetas de skills o documentación) |
+| **Configurar rol del agente** | Abre un diálogo para editar el rol base del prompt; se guarda localmente y se aplica a la próxima consulta |
 
 ### Conversar con tus documentos
 
@@ -145,6 +147,7 @@ flutter run -d linux
 | `file_picker` | Selector nativo de archivos y carpetas |
 | `get_it` | Inyección de dependencias |
 | `path` | Manipulación de rutas de archivo |
+| `shared_preferences` | Persistencia local del rol del agente |
 
 ---
 
@@ -159,16 +162,15 @@ final String embeddingModel = 'nomic-embed-text'; // Modelo para vectores
 final String llmModel = 'qwen2.5-coder:7b';       // Modelo generador
 ```
 
-### Cambiar el prompt del sistema
+### Cambiar el rol del agente
 
-El prompt base que guía las respuestas se configura en [`lib/domain/repositories/rag_repository.dart`](lib/domain/repositories/rag_repository.dart):
+El rol base que guía las respuestas ya no está hardcodeado. Se edita desde el botón **Configurar rol del agente** del panel lateral:
 
-```dart
-this.prompt = """
-  Responde la siguiente pregunta técnica sobre Dart/Flutter basándote en
-  la documentación y los plugins provistos en el contexto...
-""",
-```
+- El valor se guarda localmente con `shared_preferences` (clave `agent_role`).
+- Si se deja vacío o solo con espacios, se usa el ejemplo por defecto.
+- El cambio se aplica a la próxima pregunta, sin reindexar documentos.
+
+El texto por defecto vive en `defaultAgentRole` en [`lib/data/services/prompt_settings_service.dart`](lib/data/services/prompt_settings_service.dart).
 
 ### Métricas de GPU
 

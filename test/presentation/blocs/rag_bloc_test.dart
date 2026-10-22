@@ -50,7 +50,7 @@ class FakeRagRepository implements RagRepository {
   @override
   Future<void> updateAgentRole(String role) async {
     if (failUpdateRole) throw Exception('save failed');
-    this.role = role;
+    this.role = role.trim().isEmpty ? defaultAgentRole : role;
   }
 }
 
@@ -160,6 +160,24 @@ void main() {
 
       bloc.add(UpdateAgentRoleEvent('Rol que falla'));
       await expectation;
+    });
+
+    test('emits the default role when the update role is blank', () async {
+      final expectation = expectLater(
+        bloc.stream,
+        emits(
+          isA<AgentRoleUpdatedState>().having(
+            (s) => s.role,
+            'role',
+            defaultAgentRole,
+          ),
+        ),
+      );
+
+      bloc.add(UpdateAgentRoleEvent('   '));
+      await expectation;
+
+      expect(fakeRepo.role, defaultAgentRole);
     });
   });
 }

@@ -218,7 +218,7 @@ class RagBloc extends Bloc<RagEvent, RagState> {
   ) async {
     try {
       await repository.updateAgentRole(event.role);
-      emit(AgentRoleUpdatedState(event.role));
+      emit(AgentRoleUpdatedState(repository.agentRole));
     } catch (e) {
       emit(RagErrorState("Error al guardar el rol del agente: ${e.toString()}"));
     }

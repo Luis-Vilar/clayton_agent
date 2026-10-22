@@ -1,6 +1,6 @@
 # RAG Markdown Streaming & Telemetry Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Refactor the Flutter Linux RAG application to support file and directory Markdown ingestion, stream LLM responses from Ollama in real time, display inferencing speed (tokens/sec) and GPU load in a fixed bottom-right widget, and enforce an 800x600 minimum window size.
 
@@ -43,7 +43,7 @@
 - Consumes: GTK window created in `my_application_activate`
 - Produces: Minimum window size request of 800x600 px via GTK API
 
-- [ ] **Step 1: Edit `linux/runner/my_application.cc`**
+- [x] **Step 1: Edit `linux/runner/my_application.cc`**
 
 Set the minimum size request on the GTK window using `gtk_widget_set_size_request`:
 ```cpp
@@ -51,12 +51,12 @@ gtk_window_set_default_size(window, 1280, 720);
 gtk_widget_set_size_request(GTK_WIDGET(window), 800, 600);
 ```
 
-- [ ] **Step 2: Verify compilation**
+- [x] **Step 2: Verify compilation**
 
 Run: `flutter build linux --debug`
 Expected: Build succeeds with 0 errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add linux/runner/my_application.cc
@@ -76,7 +76,7 @@ git commit -m "feat(linux): set minimum window size to 800x600"
 - Consumes: Path to sysfs file or custom path for testing
 - Produces: `abstract class GpuMetricsService { Future<int> getGpuUsagePercent(); }`
 
-- [ ] **Step 1: Write failing unit test for `GpuMetricsService`**
+- [x] **Step 1: Write failing unit test for `GpuMetricsService`**
 
 Create `test/data/services/gpu_metrics_service_test.dart` testing:
 1. Normal reading returns integer percentage (e.g. "45\n" -> 45).
@@ -105,28 +105,28 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `flutter test test/data/services/gpu_metrics_service_test.dart`
 Expected: FAIL with compilation error (file not found).
 
-- [ ] **Step 3: Implement `GpuMetricsService`**
+- [x] **Step 3: Implement `GpuMetricsService`**
 
 Create `lib/data/services/gpu_metrics_service.dart`:
 - Scan `/sys/class/drm/card1/device/gpu_busy_percent`, fallback to `/sys/class/drm/card0/device/gpu_busy_percent`.
 - Parse integer, clamp 0-100, return 0 on any exception.
 - Accept optional `overridePath` in constructor for testing.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `flutter test test/data/services/gpu_metrics_service_test.dart`
 Expected: All tests PASS.
 
-- [ ] **Step 5: Register in `lib/core/injection.dart`**
+- [x] **Step 5: Register in `lib/core/injection.dart`**
 
 Register `GpuMetricsService` singleton in `initDependencies()`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/data/services/gpu_metrics_service.dart test/data/services/gpu_metrics_service_test.dart lib/core/injection.dart
@@ -148,7 +148,7 @@ git commit -m "feat(services): implement Linux AMD GPU metrics service"
   - `class OllamaStreamChunk { final String text; final bool isDone; final double tokensPerSecond; final int? evalCount; }`
   - `Stream<OllamaStreamChunk> generateResponseStream(String prompt);`
 
-- [ ] **Step 1: Write unit tests for NDJSON stream parser**
+- [x] **Step 1: Write unit tests for NDJSON stream parser**
 
 Create `test/data/services/ollama_service_test.dart`:
 - Test parsing lines of JSON stream chunks:
@@ -157,12 +157,12 @@ Create `test/data/services/ollama_service_test.dart`:
 - Verify calculation of TPS: `20 / (500000000 / 1e9) = 40.0`.
 - Verify handling of 0 `eval_duration` safely.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `flutter test test/data/services/ollama_service_test.dart`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `OllamaStreamChunk` and `generateResponseStream`**
+- [x] **Step 3: Implement `OllamaStreamChunk` and `generateResponseStream`**
 
 In `lib/data/services/ollama_service.dart`:
 - Add `generateResponseStream(String prompt)` to `OllamaService` interface.
@@ -174,12 +174,12 @@ In `lib/data/services/ollama_service.dart`:
   - Track start time `DateTime.now()` and token count for live TPS, and use `eval_count` / `eval_duration` when `done == true`.
   - Yield `OllamaStreamChunk`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `flutter test test/data/services/ollama_service_test.dart`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/data/models/ollama_stream_chunk.dart lib/data/services/ollama_service.dart test/data/services/ollama_service_test.dart
@@ -203,7 +203,7 @@ git commit -m "feat(ollama): add streaming response support and token metrics"
   - `Future<List<String>> getIngestedFileNames();`
   - `Stream<RagStreamUpdate> askQuestionStream(String question);`
 
-- [ ] **Step 1: Write unit tests for chunking and ingestion logic**
+- [x] **Step 1: Write unit tests for chunking and ingestion logic**
 
 Create `test/domain/repositories/rag_repository_test.dart`:
 - Test `_splitByMarkdownHeaders`:
@@ -211,12 +211,12 @@ Create `test/domain/repositories/rag_repository_test.dart`:
   - Does NOT discard sections with length > 40 characters (reproducing the bug and verifying the fix).
   - Handles markdown with headings `# Header 1`, `## Header 2`, and plain text.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `flutter test test/domain/repositories/rag_repository_test.dart`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement repository refactor**
+- [x] **Step 3: Implement repository refactor**
 
 In `lib/domain/repositories/rag_repository.dart`:
 - Fix chunk length filter: replace `if (section.trim().length > 40) continue;` with `if (section.trim().length < 20) continue;`.
@@ -230,12 +230,12 @@ In `lib/domain/repositories/rag_repository.dart`:
   - Calls `_ollamaService.generateResponseStream(prompt)`.
   - Emits `RagStreamUpdate(chunk: chunk.text, isDone: chunk.isDone, tokensPerSecond: chunk.tokensPerSecond)`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `flutter test test/domain/repositories/rag_repository_test.dart`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain/models/rag_stream_update.dart lib/domain/repositories/rag_repository.dart test/domain/repositories/rag_repository_test.dart
@@ -258,18 +258,18 @@ git commit -m "feat(rag): fix markdown chunking filter and add file ingestion wi
   - Events: `IngestFilesEvent(List<String> paths)`, `IngestSkillsDirectoryEvent(String directoryPath)`, `SendQuestionEvent(String question)`, `ClearKnowledgeBaseEvent()`, `LoadIngestedFilesEvent()`
   - States: `RagStreamingState`, `RagResponseSuccessState`, `FileIngestedSuccessState`, `KnowledgeBaseClearedState`, `RagErrorState`
 
-- [ ] **Step 1: Write unit tests for `RagBloc` streaming and events**
+- [x] **Step 1: Write unit tests for `RagBloc` streaming and events**
 
 Create `test/presentation/blocs/rag_bloc_test.dart`:
 - Test `IngestFilesEvent` emits `RagLoadingState` followed by `FileIngestedSuccessState` with file names.
 - Test `SendQuestionEvent` emits `RagLoadingState`, then progressive `RagStreamingState` instances, and finally `RagResponseSuccessState` with TPS and GPU percent.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `flutter test test/presentation/blocs/rag_bloc_test.dart`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement new events, states, and handlers in `RagBloc`**
+- [x] **Step 3: Implement new events, states, and handlers in `RagBloc`**
 
 In `lib/presentation/blocs/`:
 - `rag_event.dart`:
@@ -289,16 +289,16 @@ In `lib/presentation/blocs/`:
     - Accumulate answer buffer and emit `RagStreamingState` for intermediate chunks.
     - Emit `RagResponseSuccessState` on completion.
 
-- [ ] **Step 4: Update injection in `lib/core/injection.dart`**
+- [x] **Step 4: Update injection in `lib/core/injection.dart`**
 
 Pass `gpuMetricsService: getIt()` to `RagBloc`.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `flutter test test/presentation/blocs/rag_bloc_test.dart`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/presentation/blocs/ lib/core/injection.dart test/presentation/blocs/rag_bloc_test.dart
@@ -321,7 +321,7 @@ git commit -m "feat(bloc): add streaming and hardware telemetry support to RagBl
   - Real-time streaming response bubble with Markdown rendering.
   - Fixed bottom-right telemetry chip displaying TPS and GPU load.
 
-- [ ] **Step 1: Create `TelemetryBadge` widget**
+- [x] **Step 1: Create `TelemetryBadge` widget**
 
 In `lib/presentation/widgets/telemetry_badge.dart`:
 - Create a clean Material 3 card/chip widget:
@@ -329,7 +329,7 @@ In `lib/presentation/widgets/telemetry_badge.dart`:
   - 🎮 GPU: `${gpuPercent}%`
 - When idle (0 tok/s), displays `⚡ -- tok/s | 🎮 ${gpuPercent}%`.
 
-- [ ] **Step 2: Update `ChatScreen`**
+- [x] **Step 2: Update `ChatScreen`**
 
 In `lib/presentation/views/chat_screen.dart`:
 - Add `_pickMarkdownFiles(BuildContext context)`:
@@ -345,14 +345,14 @@ In `lib/presentation/views/chat_screen.dart`:
   - Place `TelemetryBadge` fixed at the bottom right.
 - Ensure `ListView.builder` autoscrolls smoothly on streaming updates.
 
-- [ ] **Step 3: Verify with `flutter analyze` and `flutter test`**
+- [x] **Step 3: Verify with `flutter analyze` and `flutter test`**
 
 Run: `flutter analyze`
 Expected: 0 issues found.
 Run: `flutter test`
 Expected: All tests PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add lib/presentation/widgets/telemetry_badge.dart lib/presentation/views/chat_screen.dart
@@ -366,23 +366,23 @@ git commit -m "feat(ui): update ChatScreen with streaming markdown, dual ingesti
 **Files:**
 - Full codebase integration
 
-- [ ] **Step 1: Run comprehensive analyzer and tests**
+- [x] **Step 1: Run comprehensive analyzer and tests**
 
 Run: `flutter analyze`
 Expected: No issues found.
 Run: `flutter test`
 Expected: All tests pass.
 
-- [ ] **Step 2: Build Linux Desktop Application**
+- [x] **Step 2: Build Linux Desktop Application**
 
 Run: `flutter build linux --debug`
 Expected: Successful build producing `build/linux/x64/debug/bundle/clayton_agent`.
 
-- [ ] **Step 3: Verification with test markdown file**
+- [x] **Step 3: Verification with test markdown file**
 
 Create a temporary markdown file, run a smoke test through `RagRepository` querying Ollama streaming, and verify tokens/sec and GPU readings.
 
-- [ ] **Step 4: Final commit**
+- [x] **Step 4: Final commit**
 
 ```bash
 git commit --allow-empty -m "chore: complete RAG markdown streaming and telemetry implementation"

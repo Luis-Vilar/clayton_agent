@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clayton_agent/data/services/gpu_metrics_service.dart';
 
@@ -10,16 +11,21 @@ void main() {
       await tempFile.writeAsString('38\n');
 
       final service = GpuMetricsServiceImpl(overridePath: tempFile.path);
-      final usage = await service.getGpuUsagePercent();
-
+      final usage = await service.getGpuUsageStream().first.then(
+        (result) => result,
+      );
       expect(usage, equals(38));
 
       await tempDir.delete(recursive: true);
     });
 
     test('returns 0 when file does not exist', () async {
-      final service = GpuMetricsServiceImpl(overridePath: '/non/existent/path/gpu_busy_percent');
-      final usage = await service.getGpuUsagePercent();
+      final service = GpuMetricsServiceImpl(
+        overridePath: '/non/existent/path/gpu_busy_percent',
+      );
+      final usage = await service.getGpuUsageStream().first.then(
+        (result) => result,
+      );
 
       expect(usage, equals(0));
     });
@@ -30,8 +36,9 @@ void main() {
       await tempFile.writeAsString('150\n');
 
       final service = GpuMetricsServiceImpl(overridePath: tempFile.path);
-      final usage = await service.getGpuUsagePercent();
-
+      final usage = await service.getGpuUsageStream().first.then(
+        (result) => result,
+      );
       expect(usage, equals(100));
 
       await tempDir.delete(recursive: true);

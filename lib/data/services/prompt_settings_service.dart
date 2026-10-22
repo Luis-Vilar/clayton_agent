@@ -14,14 +14,13 @@ abstract class PromptSettingsService {
 
 class PromptSettingsServiceImpl implements PromptSettingsService {
   static const String agentRoleKey = 'agent_role';
-  final SharedPreferences _preferences;
+  final SharedPreferences preferences;
 
-  PromptSettingsServiceImpl({required SharedPreferences preferences})
-    : _preferences = preferences;
+  PromptSettingsServiceImpl({required this.preferences});
 
   @override
   Future<String> loadAgentRole() async {
-    final saved = _preferences.getString(agentRoleKey)?.trim();
+    final saved = preferences.getString(agentRoleKey)?.trim();
     if (saved == null || saved.isEmpty) {
       return defaultAgentRole;
     }
@@ -30,6 +29,6 @@ class PromptSettingsServiceImpl implements PromptSettingsService {
 
   @override
   Future<void> saveAgentRole(String role) async {
-    await _preferences.setString(agentRoleKey, role);
+    await preferences.setString(agentRoleKey, role);
   }
 }

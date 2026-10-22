@@ -13,12 +13,22 @@ class MockRagRepository implements RagRepository {
   final StreamController<RagStreamUpdate> _streamController =
       StreamController<RagStreamUpdate>.broadcast();
 
+  String role = 'Rol de prueba';
+
   void pushUpdate(RagStreamUpdate update) {
     _streamController.add(update);
   }
 
   void complete() {
     _streamController.close();
+  }
+
+  @override
+  String get agentRole => role;
+
+  @override
+  Future<void> updateAgentRole(String role) async {
+    this.role = role;
   }
 
   @override
@@ -100,6 +110,35 @@ void main() {
       // Verify rendered content contains all tokens without exceptions
       expect(find.textContaining('Token1'), findsWidgets);
       expect(find.textContaining('Final.'), findsWidgets);
+
+      bloc.close();
+    },
+  );
+
+  testWidgets(
+    'ChatScreen opens the agent role dialog from the sidebar',
+    (WidgetTester tester) async {
+      final mockRepo = MockRagRepository();
+      final bloc = RagBloc(
+        repository: mockRepo,
+        gpuMetricsService: MockGpuMetricsService(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider<RagBloc>.value(
+            value: bloc,
+            child: const ChatScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Configurar rol del agente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rol del agente'), findsOneWidget);
+      expect(find.text('Restaurar ejemplo'), findsOneWidget);
 
       bloc.close();
     },

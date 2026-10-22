@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../blocs/rag_bloc.dart';
+import '../widgets/agent_role_dialog.dart';
 import '../widgets/telemetry_badge.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -214,6 +215,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: _isGenerating ? null : () => _pickSkillsDirectory(context),
                     icon: const Icon(Icons.folder_open, size: 18),
                     label: const Text('Subir Carpeta'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _isGenerating ? null : () => showAgentRoleDialog(context),
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('Configurar rol del agente'),
                   ),
                   const SizedBox(height: 20),
                   Text(

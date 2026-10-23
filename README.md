@@ -15,6 +15,8 @@
 - **100% Local & Privado** — Ningún dato sale de tu máquina. Ollama y la base de datos vectorial corren íntegramente en local.
 - **RAG (Retrieval-Augmented Generation)** — Las respuestas se generan a partir del contexto exacto de tus documentos, no de información genérica del modelo.
 - **Streaming de tokens en tiempo real** — La respuesta del LLM se va mostrando palabra a palabra mientras se genera.
+- **Markdown con resaltado de sintaxis estilo VS Code** — Los bloques de código se renderizan con el tema VS 2015 y detección automática del lenguaje. Durante el streaming, los bloques aún sin cerrar se estabilizan para que el Markdown no se rompa.
+- **Contexto ampliado** — Cada consulta recupera hasta **10 fragmentos** relevantes del vector store, en lugar de 4, para respuestas con más cobertura documental.
 - **Base de datos vectorial embebida** — Usa [ObjectBox](https://objectbox.io/) con índice HNSW para búsqueda semántica ultrarrápida.
 - **Telemetría en vivo** — Muestra tokens/segundo y uso de GPU mientras el modelo genera.
 - **Ingesta flexible** — Soporta archivos `.md` individuales o carpetas completas de manera recursiva.
@@ -38,7 +40,7 @@ lib/
 │   └── repositories/ # RagRepository (lógica RAG: chunking, búsqueda, prompting)
 └── presentation/
     ├── blocs/      # RagBloc (flutter_bloc: eventos, estados, streaming)
-    ├── views/      # ChatScreen (UI principal)
+    ├── views/      # ChatScreen (UI principal y CodeBlockBuilder)
     └── widgets/    # AgentRoleDialog, TelemetryBadge
 ```
 
@@ -46,10 +48,10 @@ lib/
 
 ```
 Documento .md  →  Chunking por encabezados  →  Embedding (nomic-embed-text)  →  ObjectBox (HNSW)
-                                                                                        ↓
-Pregunta del usuario  →  Embedding  →  Búsqueda de vecinos más cercanos  →  Prompt enriquecido
-                                                                                        ↓
-                                                                         Ollama (qwen2.5-coder:7b)  →  Respuesta en Markdown
+
+Pregunta del usuario  →  Embedding  →  Obtención de los 10 chunks más similares
+      →  Prompt enriquecido (rol + contexto)  →  Ollama (qwen2.5-coder:7b)
+      →  Respuesta Markdown con resaltado de sintaxis estilo VS Code
 ```
 
 ---
@@ -127,7 +129,7 @@ flutter run -d linux
 
 1. Escribe tu pregunta en el campo de texto inferior.
 2. Presiona **Enter** o el botón de enviar.
-3. La respuesta se genera en streaming con formato Markdown.
+3. La respuesta se genera en streaming con formato Markdown y resaltado de sintaxis estilo VS Code en los bloques de código.
 
 ### Gestionar la base de conocimiento
 
@@ -144,6 +146,8 @@ flutter run -d linux
 | `objectbox` + `objectbox_flutter_libs` | Base de datos vectorial local con HNSW |
 | `dio` | Cliente HTTP para la API de Ollama |
 | `flutter_markdown` | Renderizado de respuestas en Markdown |
+| `flutter_highlighter` + `highlight` | Resaltado de sintaxis estilo VS Code (tema VS 2015) |
+| `markdown` | Parseo del Markdown y detección del lenguaje en bloques de código |
 | `file_picker` | Selector nativo de archivos y carpetas |
 | `get_it` | Inyección de dependencias |
 | `path` | Manipulación de rutas de archivo |
@@ -161,6 +165,31 @@ Edita las constantes en [`lib/data/services/ollama_service.dart`](lib/data/servi
 final String embeddingModel = 'nomic-embed-text'; // Modelo para vectores
 final String llmModel = 'qwen2.5-coder:7b';       // Modelo generador
 ```
+
+### Ajustar el contexto recuperado
+
+Por cada pregunta, el repositorio recupera los **10 chunks** más similares y los concatena en el prompt. Puedes cambiar ese número en [`lib/domain/repositories/rag_repository.dart`](lib/domain/repositories/rag_repository.dart):
+
+```dart
+final relevantChunks = await vectorDbService.searchSimilarChunks(
+  queryFloat32Embedding,
+  10, // Número de fragmentos enviados como contexto
+);
+```
+
+Un valor más alto aporta más contexto pero alarga el prompt y consume más memoria/tiempo del modelo.
+
+### Ventana de contexto de los embeddings
+
+Las llamadas a `/embed` envían `options.num_ctx: 8192` para que las secciones largas de Markdown no se trunquen antes de generar el vector. Está definido en [`lib/data/services/ollama_service.dart`](lib/data/services/ollama_service.dart).
+
+### Resaltado de sintaxis
+
+Los bloques de código de las respuestas se renderizan con `CodeBlockBuilder` en [`lib/presentation/views/chat_screen.dart`](lib/presentation/views/chat_screen.dart):
+
+- Usa `flutter_highlighter` con el tema `vs2015Theme`.
+- Detecta el lenguaje indicado tras las comillas del bloque (por ejemplo, `dart`).
+- Si el bloque aún no está cerrado durante el streaming, se añade un cierre temporal para que el Markdown se renderice de forma estable.
 
 ### Cambiar el rol del agente
 

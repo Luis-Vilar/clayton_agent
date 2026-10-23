@@ -12,8 +12,11 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
+  flutter_highlighter: ^0.1.1
   flutter_markdown: ^0.7.7+1
+  flutter_streaming_text_markdown: ^1.10.0
   get_it: ^9.3.0
+  highlight: ^0.7.0
   markdown: ^7.3.1
   objectbox: ^5.3.2
   objectbox_flutter_libs: ^5.3.2

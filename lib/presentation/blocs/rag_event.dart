@@ -20,3 +20,10 @@ class SendQuestionEvent extends RagEvent {
 }
 
 class ClearKnowledgeBaseEvent extends RagEvent {}
+
+class LoadAgentRoleEvent extends RagEvent {}
+
+class UpdateAgentRoleEvent extends RagEvent {
+  final String role;
+  UpdateAgentRoleEvent(this.role);
+}

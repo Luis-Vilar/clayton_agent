@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_highlighter/flutter_highlighter.dart';
+import 'package:flutter_highlighter/themes/vs2015.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../blocs/rag_bloc.dart';
+import '../widgets/agent_role_dialog.dart';
 import '../widgets/telemetry_badge.dart';
+
+import 'package:markdown/markdown.dart' as md;
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -24,6 +29,21 @@ class _ChatScreenState extends State<ChatScreen> {
   int _gpuUsage = 0;
   bool _isGenerating = false;
   bool _isScrollScheduled = false;
+
+  String _estabilizarMarkdown(String textoIncompleto) {
+    if (textoIncompleto.isEmpty) return '';
+
+    // Contamos cuántas veces aparecen las 3 comillas invertidas
+    int conteoComillas = '```'.allMatches(textoIncompleto).length;
+
+    // // Si es impar, Ollama abrió un bloque de código pero aún no lo cierra
+    if (conteoComillas % 2 != 0) {
+      // Forzamos un cierre temporal al final de la cadena
+      return '$textoIncompleto\n```';
+    }
+
+    return textoIncompleto;
+  }
 
   @override
   void initState() {
@@ -61,8 +81,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (pickedFiles.isNotEmpty) {
-      final validPaths =
-          pickedFiles.map((f) => f.path).whereType<String>().toList();
+      final validPaths = pickedFiles
+          .map((f) => f.path)
+          .whereType<String>()
+          .toList();
       if (validPaths.isNotEmpty && context.mounted) {
         context.read<RagBloc>().add(IngestMarkdownFilesEvent(validPaths));
       }
@@ -140,7 +162,8 @@ class _ChatScreenState extends State<ChatScreen> {
               _gpuUsage = state.gpuUsagePercent;
               _isGenerating = true;
 
-              if (_messages.isNotEmpty && _messages.last['role'] == 'assistant') {
+              if (_messages.isNotEmpty &&
+                  _messages.last['role'] == 'assistant') {
                 _messages.last['text'] = state.accumulatedAnswer;
               } else {
                 _messages.add({
@@ -156,7 +179,8 @@ class _ChatScreenState extends State<ChatScreen> {
               _gpuUsage = state.gpuUsagePercent;
               _isGenerating = false;
 
-              if (_messages.isNotEmpty && _messages.last['role'] == 'assistant') {
+              if (_messages.isNotEmpty &&
+                  _messages.last['role'] == 'assistant') {
                 _messages.last['text'] = state.answer;
               } else {
                 _messages.add({'role': 'assistant', 'text': state.answer});
@@ -180,7 +204,9 @@ class _ChatScreenState extends State<ChatScreen> {
             // PANEL LATERAL IZQUIERDO: Control de Archivos Markdown
             Container(
               width: 290,
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.4,
+              ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -194,7 +220,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: _isGenerating
                         ? null
                         : () {
-                            context.read<RagBloc>().add(ClearKnowledgeBaseEvent());
+                            context.read<RagBloc>().add(
+                              ClearKnowledgeBaseEvent(),
+                            );
                           },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.redAccent,
@@ -205,20 +233,35 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: _isGenerating ? null : () => _pickMarkdownFiles(context),
+                    onPressed: _isGenerating
+                        ? null
+                        : () => _pickMarkdownFiles(context),
                     icon: const Icon(Icons.note_add, size: 18),
                     label: const Text('Subir Archivo(s)'),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: _isGenerating ? null : () => _pickSkillsDirectory(context),
+                    onPressed: _isGenerating
+                        ? null
+                        : () => _pickSkillsDirectory(context),
                     icon: const Icon(Icons.folder_open, size: 18),
                     label: const Text('Subir Carpeta'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _isGenerating
+                        ? null
+                        : () => showAgentRoleDialog(context),
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('Configurar rol del agente'),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     'Documentos Indexados (${_ingestedFiles.length}):',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
@@ -235,7 +278,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : ListView.separated(
                             itemCount: _ingestedFiles.length,
-                            separatorBuilder: (context, _) => const Divider(height: 1),
+                            separatorBuilder: (context, _) =>
+                                const Divider(height: 1),
                             itemBuilder: (context, index) => ListTile(
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(
@@ -284,7 +328,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                     ? Alignment.centerRight
                                     : Alignment.centerLeft,
                                 child: Container(
-                                  width: MediaQuery.of(context).size.width * 0.58,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.58,
                                   margin: const EdgeInsets.symmetric(
                                     vertical: 8.0,
                                   ),
@@ -299,14 +344,29 @@ class _ChatScreenState extends State<ChatScreen> {
                                       ? Text(
                                           msg['text'] ?? '',
                                           style: TextStyle(
-                                            color: theme.colorScheme.onPrimaryContainer,
+                                            color: theme
+                                                .colorScheme
+                                                .onPrimaryContainer,
                                           ),
                                         )
                                       : MarkdownBody(
-                                          data: msg['text'] ?? '',
-                                          // Se desactiva la selección en el mensaje activo durante la generación
-                                          // para evitar el cálculo continuo del árbol de selección en cada chunk.
-                                          selectable: !_isGenerating || index != _messages.length - 1,
+                                          // 1. Estabilizamos el texto "al vuelo" si es el mensaje activo en generación
+                                          data:
+                                              (_isGenerating &&
+                                                  index == _messages.length - 1)
+                                              ? _estabilizarMarkdown(
+                                                  msg['text'] ?? '',
+                                                )
+                                              : (msg['text'] ?? ''),
+
+                                          selectable:
+                                              !_isGenerating ||
+                                              index != _messages.length - 1,
+
+                                          // 2. Añadimos el builder para el color estilo VS Code
+                                          builders: {
+                                            'code': CodeBlockBuilder(), // El builder que creamos antes
+                                          },
                                         ),
                                 ),
                               );
@@ -326,7 +386,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Flexible(
@@ -364,8 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: TextField(
                                 controller: _questionController,
                                 decoration: const InputDecoration(
-                                  hintText:
-                                      'Pregúntale al modelo sobre el contexto indexado...',
+                                  hintText: 'Pregúntale al modelo sobre el contexto indexado...',
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -410,6 +471,38 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class CodeBlockBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    String codeContent = element.textContent.trim();
+    String language = 'plaintext';
+
+    // Detectar el lenguaje (ej: ```dart)
+    if (element.attributes['class'] != null) {
+      String lg = element.attributes['class']!;
+      if (lg.startsWith('language-')) {
+        language = lg.substring(9);
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E), // Fondo VS Code
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: HighlightView(
+        codeContent,
+        language: language,
+        theme: vs2015Theme,
+        textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 14),
       ),
     );
   }

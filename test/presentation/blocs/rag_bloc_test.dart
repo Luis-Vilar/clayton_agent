@@ -1,11 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clayton_agent/data/services/gpu_metrics_service.dart';
+import 'package:clayton_agent/data/services/prompt_settings_service.dart';
 import 'package:clayton_agent/domain/models/rag_stream_update.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
 import 'package:clayton_agent/presentation/blocs/rag_bloc.dart';
 
 class FakeRagRepository implements RagRepository {
   List<String> files = ['initial.md'];
+  String role = defaultAgentRole;
+  bool failUpdateRole = false;
 
   @override
   Future<List<String>> ingestFiles(List<String> filePaths) async {
@@ -40,6 +43,15 @@ class FakeRagRepository implements RagRepository {
 
   @override
   Future<void> clearKnowledgeBase() async => files.clear();
+
+  @override
+  String get agentRole => role;
+
+  @override
+  Future<void> updateAgentRole(String role) async {
+    if (failUpdateRole) throw Exception('save failed');
+    this.role = role.trim().isEmpty ? defaultAgentRole : role;
+  }
 }
 
 class FakeGpuMetricsService implements GpuMetricsService {
@@ -115,6 +127,57 @@ void main() {
       expectLater(bloc.stream, emitsInOrder(expectedStates));
 
       bloc.add(SendQuestionEvent('¿Cómo estás?'));
+    });
+
+    test('emits AgentRoleLoadedState on LoadAgentRoleEvent', () async {
+      fakeRepo.role = 'Rol persistido';
+
+      final expectation = expectLater(
+        bloc.stream,
+        emits(isA<AgentRoleLoadedState>().having((s) => s.role, 'role', 'Rol persistido')),
+      );
+
+      bloc.add(LoadAgentRoleEvent());
+      await expectation;
+    });
+
+    test('emits AgentRoleUpdatedState and persists on UpdateAgentRoleEvent', () async {
+      final expectation = expectLater(
+        bloc.stream,
+        emits(isA<AgentRoleUpdatedState>().having((s) => s.role, 'role', 'Rol nuevo')),
+      );
+
+      bloc.add(UpdateAgentRoleEvent('Rol nuevo'));
+      await expectation;
+
+      expect(fakeRepo.role, 'Rol nuevo');
+    });
+
+    test('emits RagErrorState when updating the role fails', () async {
+      fakeRepo.failUpdateRole = true;
+
+      final expectation = expectLater(bloc.stream, emits(isA<RagErrorState>()));
+
+      bloc.add(UpdateAgentRoleEvent('Rol que falla'));
+      await expectation;
+    });
+
+    test('emits the default role when the update role is blank', () async {
+      final expectation = expectLater(
+        bloc.stream,
+        emits(
+          isA<AgentRoleUpdatedState>().having(
+            (s) => s.role,
+            'role',
+            defaultAgentRole,
+          ),
+        ),
+      );
+
+      bloc.add(UpdateAgentRoleEvent('   '));
+      await expectation;
+
+      expect(fakeRepo.role, defaultAgentRole);
     });
   });
 }

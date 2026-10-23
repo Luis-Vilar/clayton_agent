@@ -53,3 +53,13 @@ class RagErrorState extends RagState {
 }
 
 class KnowledgeBaseClearedState extends RagState {}
+
+class AgentRoleLoadedState extends RagState {
+  final String role;
+  AgentRoleLoadedState(this.role);
+}
+
+class AgentRoleUpdatedState extends RagState {
+  final String role;
+  AgentRoleUpdatedState(this.role);
+}

@@ -1,5 +1,6 @@
 import 'package:clayton_agent/data/services/gpu_metrics_service.dart';
 import 'package:clayton_agent/data/services/ollama_service.dart';
+import 'package:clayton_agent/data/services/prompt_settings_service.dart';
 import 'package:clayton_agent/data/services/vector_db_service.dart';
 import 'package:clayton_agent/data/services/vector_store_initializer.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
@@ -7,6 +8,7 @@ import 'package:clayton_agent/presentation/blocs/rag_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:dio/dio.dart';
 import 'package:objectbox/objectbox.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Importa aquí tus capas (Services, Repositories, Blocs) que crearemos abajo
 
@@ -44,8 +46,19 @@ Future<void> initDependencies() async {
   );
 
   // 4. Repositorios (Domain / Business Logic)
+  final preferences = await SharedPreferences.getInstance();
+  getIt.registerSingleton<SharedPreferences>(preferences);
+  getIt.registerLazySingleton<PromptSettingsService>(
+    () => PromptSettingsServiceImpl(preferences: getIt()),
+  );
+  final initialAgentRole = await getIt<PromptSettingsService>().loadAgentRole();
   getIt.registerLazySingleton<RagRepository>(
-    () => RagRepositoryImpl(ollamaService: getIt(), vectorDbService: getIt()),
+    () => RagRepositoryImpl(
+      ollamaService: getIt(),
+      vectorDbService: getIt(),
+      promptSettingsService: getIt(),
+      initialAgentRole: initialAgentRole,
+    ),
   );
 
   // 5. Blocs (Presentación) - registerFactory para que se creen instancias nuevas al usarse

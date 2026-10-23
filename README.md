@@ -4,7 +4,7 @@
 
 ---
 
-[clayton_agent.webm](https://github.com/user-attachments/assets/2a116aaf-8159-4a28-b3ba-48f5f3a034ff)
+[clayton_agent.webm](https://github.com/user-attachments/assets/6cd03160-fa62-4797-9366-0b5c0072bf68)
 
 [ollama run qwen2.5-coder:7b.webm](https://github.com/user-attachments/assets/839e07d0-da5d-4854-b119-c303a9b1346c)
 

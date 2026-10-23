@@ -163,7 +163,7 @@ class RagRepositoryImpl implements RagRepository {
     );
     final relevantChunks = await vectorDbService.searchSimilarChunks(
       queryFloat32Embedding,
-      4,
+      10,
     );
 
     if (relevantChunks.isEmpty) {
@@ -173,6 +173,7 @@ class RagRepositoryImpl implements RagRepository {
     final context = relevantChunks.map((c) => c.content).join("\n---\n");
 
     return """
+[Rol del Agente]
 $_agentRole
 
 [Contexto de Agent Skills]

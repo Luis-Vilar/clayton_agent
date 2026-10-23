@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:dio/dio.dart';
+
 import '../models/ollama_stream_chunk.dart';
 
 abstract class OllamaService {
@@ -21,18 +23,24 @@ class OllamaServiceImpl implements OllamaService {
     try {
       final response = await _dio.post(
         '/embed',
-        data: {'model': embeddingModel, 'input': text},
+        data: {
+          'model': embeddingModel,
+          'input': text,
+          "options": {"num_ctx": 8192},
+        },
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> rawEmbeddings = response.data['embeddings'];
-        
+
         if (rawEmbeddings.isNotEmpty) {
           // 1. Extraemos la primera lista interna (que es un List<dynamic>)
           final List<dynamic> firstEmbedding = rawEmbeddings.first;
-          
+
           // 2. CORRECCIÓN: Transformamos de forma segura cada elemento dinámico a double
-          return firstEmbedding.map((element) => (element as num).toDouble()).toList();
+          return firstEmbedding
+              .map((element) => (element as num).toDouble())
+              .toList();
         }
       }
       throw Exception('Error al obtener embedding de Ollama');
@@ -67,11 +75,7 @@ class OllamaServiceImpl implements OllamaService {
     try {
       final response = await _dio.post<ResponseBody>(
         '/generate',
-        data: {
-          'model': llmModel,
-          'prompt': prompt,
-          'stream': true,
-        },
+        data: {'model': llmModel, 'prompt': prompt, 'stream': true},
         options: Options(responseType: ResponseType.stream),
       );
 
@@ -121,7 +125,9 @@ class OllamaServiceImpl implements OllamaService {
         yield OllamaStreamChunk(
           text: text,
           isDone: isDone,
-          tokensPerSecond: currentTps.isNaN || currentTps.isInfinite ? 0.0 : currentTps,
+          tokensPerSecond: currentTps.isNaN || currentTps.isInfinite
+              ? 0.0
+              : currentTps,
           evalCount: evalCount,
           evalDurationNano: evalDuration,
         );

@@ -14,6 +14,7 @@ dependencies:
   flutter_bloc: ^9.1.1
   flutter_highlighter: ^0.1.1
   flutter_markdown: ^0.7.7+1
+  flutter_omarchy: ^0.3.0
   flutter_streaming_text_markdown: ^1.10.0
   get_it: ^9.3.0
   highlight: ^0.7.0

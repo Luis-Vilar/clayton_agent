@@ -1,15 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_highlighter/flutter_highlighter.dart';
-import 'package:flutter_highlighter/themes/vs2015.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_omarchy/flutter_omarchy.dart';
 
 import '../blocs/rag_bloc.dart';
 import '../widgets/agent_role_dialog.dart';
-import '../widgets/telemetry_badge.dart';
-
-import 'package:markdown/markdown.dart' as md;
+import '../widgets/chat_composer.dart';
+import '../widgets/chat_message.dart';
+import '../widgets/knowledge_panel.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -29,21 +26,6 @@ class _ChatScreenState extends State<ChatScreen> {
   int _gpuUsage = 0;
   bool _isGenerating = false;
   bool _isScrollScheduled = false;
-
-  String _estabilizarMarkdown(String textoIncompleto) {
-    if (textoIncompleto.isEmpty) return '';
-
-    // Contamos cuántas veces aparecen las 3 comillas invertidas
-    int conteoComillas = '```'.allMatches(textoIncompleto).length;
-
-    // // Si es impar, Ollama abrió un bloque de código pero aún no lo cierra
-    if (conteoComillas % 2 != 0) {
-      // Forzamos un cierre temporal al final de la cadena
-      return '$textoIncompleto\n```';
-    }
-
-    return textoIncompleto;
-  }
 
   @override
   void initState() {
@@ -115,12 +97,45 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  String _documentLabel(int count) =>
+      '$count ${count == 1 ? 'documento' : 'documentos'}';
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = OmarchyTheme.of(context);
 
-    return Scaffold(
-      body: BlocListener<RagBloc, RagState>(
+    return OmarchyScaffold(
+      navigationBar: _ShellNavigationBar(
+        onConfigureRole: () => showAgentRoleDialog(context),
+      ),
+      leadingPanel: KnowledgePanel(
+        files: _ingestedFiles,
+        isBusy: _isGenerating,
+        onPickFiles: () => _pickMarkdownFiles(context),
+        onPickDirectory: () => _pickSkillsDirectory(context),
+        onClear: () => context.read<RagBloc>().add(ClearKnowledgeBaseEvent()),
+      ),
+      panelInitialSize: const PanelSize.absolute(300),
+      minPanelSize: const PanelSize.absolute(240),
+      maxPanelSize: const PanelSize.absolute(420),
+      status: OmarchyStatusBar(
+        leading: [
+          const OmarchyStatus(accent: AnsiColor.green, child: Text('● local')),
+          OmarchyStatus(child: Text(_documentLabel(_ingestedFiles.length))),
+        ],
+        trailing: [
+          OmarchyStatus(
+            accent: AnsiColor.yellow,
+            child: Text(
+              _currentTps > 0
+                  ? '${_currentTps.toStringAsFixed(1)} tok/s'
+                  : '-- tok/s',
+            ),
+          ),
+          OmarchyStatus(accent: AnsiColor.blue, child: Text('GPU $_gpuUsage%')),
+        ],
+      ),
+      child: BlocListener<RagBloc, RagState>(
         listener: (context, state) {
           if (state is KnowledgeBaseClearedState) {
             setState(() {
@@ -129,11 +144,11 @@ class _ChatScreenState extends State<ChatScreen> {
               _currentTps = 0.0;
               _isGenerating = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  '🗑️ Base de datos vectorial vaciada por completo.',
-                ),
+            showOmarchyToast(
+              context: context,
+              accent: AnsiColor.yellow,
+              message: const Text(
+                'Base de datos vectorial vaciada por completo.',
               ),
             );
           } else if (state is FileIngestedSuccessState) {
@@ -144,11 +159,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
               }
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '✅ ${state.fileNames.length} archivo(s) indexado(s) con éxito.',
-                ),
+            showOmarchyToast(
+              context: context,
+              accent: AnsiColor.green,
+              message: Text(
+                '${state.fileNames.length} archivo(s) indexado(s) con éxito.',
               ),
             );
           } else if (state is RagLoadedFilesState) {
@@ -191,319 +206,123 @@ class _ChatScreenState extends State<ChatScreen> {
             setState(() {
               _isGenerating = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Error: ${state.errorMessage}'),
-                backgroundColor: Colors.redAccent,
-              ),
+            showOmarchyToast(
+              context: context,
+              accent: AnsiColor.red,
+              message: Text('Error: ${state.errorMessage}'),
             );
           }
         },
-        child: Row(
+        child: Column(
           children: [
-            // PANEL LATERAL IZQUIERDO: Control de Archivos Markdown
-            Container(
-              width: 290,
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.4,
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Conocimiento Local',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: _isGenerating
-                        ? null
-                        : () {
-                            context.read<RagBloc>().add(
-                              ClearKnowledgeBaseEvent(),
-                            );
-                          },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      side: const BorderSide(color: Colors.redAccent),
-                    ),
-                    icon: const Icon(Icons.delete_sweep, size: 18),
-                    label: const Text('Limpiar Base de Datos'),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _isGenerating
-                        ? null
-                        : () => _pickMarkdownFiles(context),
-                    icon: const Icon(Icons.note_add, size: 18),
-                    label: const Text('Subir Archivo(s)'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _isGenerating
-                        ? null
-                        : () => _pickSkillsDirectory(context),
-                    icon: const Icon(Icons.folder_open, size: 18),
-                    label: const Text('Subir Carpeta'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _isGenerating
-                        ? null
-                        : () => showAgentRoleDialog(context),
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: const Text('Configurar rol del agente'),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Documentos Indexados (${_ingestedFiles.length}):',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _ingestedFiles.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No hay documentos cargados.\nAgrega archivos .md o carpetas.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _ingestedFiles.length,
-                            separatorBuilder: (context, _) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) => ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              leading: const Icon(
-                                Icons.article,
-                                color: Colors.blueAccent,
-                                size: 20,
-                              ),
-                              title: Text(
-                                _ingestedFiles[index],
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-            ),
-
-            // SECCIÓN PRINCIPAL DERECHA: Chat Técnico RAG y Telemetría
             Expanded(
-              child: Column(
-                children: [
-                  // Área del historial de conversación
-                  Expanded(
-                    child: _messages.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Haz una pregunta sobre tus documentos Markdown indexados.',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16.0),
-                            itemCount: _messages.length,
-                            itemBuilder: (context, index) {
-                              final msg = _messages[index];
-                              final isUser = msg['role'] == 'user';
-                              return Align(
-                                alignment: isUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.58,
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 8.0,
-                                  ),
-                                  padding: const EdgeInsets.all(14.0),
-                                  decoration: BoxDecoration(
-                                    color: isUser
-                                        ? theme.colorScheme.primaryContainer
-                                        : theme.colorScheme.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(12.0),
-                                  ),
-                                  child: isUser
-                                      ? Text(
-                                          msg['text'] ?? '',
-                                          style: TextStyle(
-                                            color: theme
-                                                .colorScheme
-                                                .onPrimaryContainer,
-                                          ),
-                                        )
-                                      : MarkdownBody(
-                                          // 1. Estabilizamos el texto "al vuelo" si es el mensaje activo en generación
-                                          data:
-                                              (_isGenerating &&
-                                                  index == _messages.length - 1)
-                                              ? _estabilizarMarkdown(
-                                                  msg['text'] ?? '',
-                                                )
-                                              : (msg['text'] ?? ''),
-
-                                          selectable:
-                                              !_isGenerating ||
-                                              index != _messages.length - 1,
-
-                                          // 2. Añadimos el builder para el color estilo VS Code
-                                          builders: {
-                                            'code': CodeBlockBuilder(), // El builder que creamos antes
-                                          },
-                                        ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-
-                  // Indicador visual dinámico de carga usando el Bloc State
-                  BlocBuilder<RagBloc, RagState>(
-                    builder: (context, state) {
-                      if (state is RagLoadingState) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Flexible(
-                                child: Text(
-                                  state.message,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-
-                  // Barra inferior de entrada de texto
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: theme.dividerColor),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+              child: _messages.isEmpty ? _emptyState(theme) : _messageList(),
+            ),
+            BlocBuilder<RagBloc, RagState>(
+              builder: (context, state) {
+                if (state is RagLoadingState) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _questionController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Pregúntale al modelo sobre el contexto indexado...',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                onSubmitted: (_) => _sendQuestion(context),
-                              ),
+                        const OmarchyLoader(size: 14, accent: AnsiColor.blue),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            state.message,
+                            style: theme.text.normal.copyWith(
+                              fontSize: 12,
+                              color: theme.colors.bright.black,
                             ),
-                            const SizedBox(width: 12),
-                            IconButton.filled(
-                              icon: _isGenerating
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.send),
-                              onPressed: _isGenerating
-                                  ? null
-                                  : () => _sendQuestion(context),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Barra fija inferior derecha con métricas de hardware y tokens
-                        Row(
-                          children: [
-                            const Spacer(),
-                            TelemetryBadge(
-                              tokensPerSecond: _currentTps,
-                              gpuUsagePercent: _gpuUsage,
-                              isGenerating: _isGenerating,
-                            ),
-                          ],
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            ChatComposer(
+              controller: _questionController,
+              isGenerating: _isGenerating,
+              onSend: () => _sendQuestion(context),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _emptyState(OmarchyThemeData theme) {
+    return Center(
+      child: Text(
+        '> Haz una pregunta sobre tus documentos Markdown indexados.',
+        style: theme.text.italic.copyWith(color: theme.colors.bright.black),
+      ),
+    );
+  }
+
+  Widget _messageList() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final message = _messages[index];
+        final isUser = message['role'] == 'user';
+        final isStreaming =
+            _isGenerating && !isUser && index == _messages.length - 1;
+
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ChatMessage(
+                isUser: isUser,
+                text: message['text'] ?? '',
+                isStreaming: isStreaming,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
-class CodeBlockBuilder extends MarkdownElementBuilder {
+class _ShellNavigationBar extends StatelessWidget {
+  const _ShellNavigationBar({required this.onConfigureRole});
+
+  final VoidCallback onConfigureRole;
+
   @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    String codeContent = element.textContent.trim();
-    String language = 'plaintext';
+  Widget build(BuildContext context) {
+    final panel = OmarchyScaffold.leadingPanelMaybeOf(context);
 
-    // Detectar el lenguaje (ej: ```dart)
-    if (element.attributes['class'] != null) {
-      String lg = element.attributes['class']!;
-      if (lg.startsWith('language-')) {
-        language = lg.substring(9);
-      }
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Fondo VS Code
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: HighlightView(
-        codeContent,
-        language: language,
-        theme: vs2015Theme,
-        textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-      ),
+    return OmarchyNavigationBar(
+      title: const Text('clayton_agent'),
+      leading: panel != null && panel.isHidden
+          ? [
+              OmarchyButton(
+                onPressed: () => panel.hiddenController.isVisible = true,
+                child: const Icon(OmarchyIcons.codMenu, size: 16),
+              ),
+            ]
+          : null,
+      trailing: [
+        OmarchyTooltip(
+          message: 'Configurar rol del agente',
+          child: OmarchyButton(
+            onPressed: onConfigureRole,
+            child: const Icon(OmarchyIcons.codSettingsGear, size: 16),
+          ),
+        ),
+      ],
     );
   }
 }

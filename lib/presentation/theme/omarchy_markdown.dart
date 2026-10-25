@@ -7,16 +7,20 @@ import 'package:markdown/markdown.dart' as md;
 MarkdownStyleSheet omarchyMarkdownStyleSheet(BuildContext context) {
   final theme = OmarchyTheme.of(context);
   final bright = theme.colors.bright;
+  final foreground = theme.colors.foreground;
 
   return MarkdownStyleSheet(
-    p: theme.text.normal,
+    p: theme.text.normal.copyWith(color: foreground),
     a: theme.text.normal.copyWith(
       color: bright.blue,
       decoration: TextDecoration.underline,
     ),
-    em: theme.text.italic,
-    strong: theme.text.bold,
-    del: theme.text.normal.copyWith(decoration: TextDecoration.lineThrough),
+    em: theme.text.italic.copyWith(color: foreground),
+    strong: theme.text.bold.copyWith(color: foreground),
+    del: theme.text.normal.copyWith(
+      color: foreground,
+      decoration: TextDecoration.lineThrough,
+    ),
     code: theme.text.normal.copyWith(
       color: bright.green,
       backgroundColor: theme.colors.normal.black,
@@ -32,7 +36,14 @@ MarkdownStyleSheet omarchyMarkdownStyleSheet(BuildContext context) {
       border: Border(left: BorderSide(color: bright.yellow, width: 2)),
     ),
     blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-    listBullet: theme.text.normal,
+    listBullet: theme.text.normal.copyWith(color: foreground),
+    checkbox: theme.text.normal.copyWith(color: bright.green),
+    tableHead: theme.text.bold.copyWith(color: foreground),
+    tableBody: theme.text.normal.copyWith(color: foreground),
+    tableBorder: TableBorder.all(color: theme.colors.border),
+    horizontalRuleDecoration: BoxDecoration(
+      border: Border(top: BorderSide(color: theme.colors.border)),
+    ),
     blockSpacing: 8,
     listIndent: 18,
   );

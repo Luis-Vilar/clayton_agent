@@ -28,6 +28,29 @@ void main() {
     expect(sent, 1);
   });
 
+  testWidgets('submits with Enter when idle', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var sent = 0;
+
+    await tester.pumpWidget(
+      wrapInOmarchy(
+        SizedBox(
+          width: 600,
+          child: ChatComposer(
+            controller: controller,
+            isGenerating: false,
+            onSend: () => sent++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(EditableText), 'Hola');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    expect(sent, 1);
+  });
+
   testWidgets('does not submit while generating', (tester) async {
     final controller = TextEditingController();
     addTearDown(controller.dispose);

@@ -111,4 +111,38 @@ void main() {
     );
     expect(saveButton.onPressed, isNull);
   });
+
+  testWidgets('fits its actions in a narrow window', (tester) async {
+    tester.view.physicalSize = const Size(480, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = FakeRepo();
+    final bloc = RagBloc(repository: repo, gpuMetricsService: FakeGpu());
+    addTearDown(bloc.close);
+
+    await tester.pumpWidget(
+      wrapInOmarchy(
+        BlocProvider.value(
+          value: bloc,
+          child: Builder(
+            builder: (context) => Center(
+              child: OmarchyButton(
+                onPressed: () => showAgentRoleDialog(context),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rol del agente'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(find.text('Guardar')).right, lessThanOrEqualTo(480));
+  });
 }

@@ -77,24 +77,35 @@ class _AgentRoleDialogState extends State<AgentRoleDialog> {
                   child: Center(child: OmarchyLoader(accent: AnsiColor.blue)),
                 ),
           actions: [
-            OmarchyButton(
-              onPressed: _loaded
-                  ? () => setState(() => _controller.text = defaultAgentRole)
-                  : null,
-              child: const Text('Restaurar ejemplo'),
-            ),
-            OmarchyButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            OmarchyButton(
-              style: const OmarchyButtonStyle.filled(AnsiColor.blue),
-              onPressed: _loaded
-                  ? () => context.read<RagBloc>().add(
-                      UpdateAgentRoleEvent(_controller.text),
-                    )
-                  : null,
-              child: const Text('Guardar'),
+            Flexible(
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OmarchyButton(
+                    onPressed: _loaded
+                        ? () => setState(
+                            () => _controller.text = defaultAgentRole,
+                          )
+                        : null,
+                    child: const Text('Restaurar ejemplo'),
+                  ),
+                  OmarchyButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                  OmarchyButton(
+                    style: const OmarchyButtonStyle.filled(AnsiColor.blue),
+                    onPressed: _loaded
+                        ? () => context.read<RagBloc>().add(
+                            UpdateAgentRoleEvent(_controller.text),
+                          )
+                        : null,
+                    child: const Text('Guardar'),
+                  ),
+                ],
+              ),
             ),
           ],
         );

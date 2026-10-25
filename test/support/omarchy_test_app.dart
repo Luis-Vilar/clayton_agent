@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 
 const OmarchyThemeData testOmarchyTheme = OmarchyThemeData(

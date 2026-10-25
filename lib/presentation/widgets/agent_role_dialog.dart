@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 
@@ -10,10 +9,8 @@ Future<void> showAgentRoleDialog(BuildContext context) {
   bloc.add(LoadAgentRoleEvent());
   return showOmarchyDialog<void>(
     context: context,
-    builder: (_) => BlocProvider.value(
-      value: bloc,
-      child: const AgentRoleDialog(),
-    ),
+    builder: (_) =>
+        BlocProvider.value(value: bloc, child: const AgentRoleDialog()),
   );
 }
 
@@ -77,9 +74,7 @@ class _AgentRoleDialogState extends State<AgentRoleDialog> {
                 )
               : const SizedBox(
                   height: 80,
-                  child: Center(
-                    child: OmarchyLoader(accent: AnsiColor.blue),
-                  ),
+                  child: Center(child: OmarchyLoader(accent: AnsiColor.blue)),
                 ),
           actions: [
             OmarchyButton(

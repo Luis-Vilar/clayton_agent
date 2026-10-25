@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 
@@ -35,7 +34,9 @@ class ChatMessage extends StatelessWidget {
           style: theme.text.bold.copyWith(
             fontSize: 10,
             letterSpacing: 1,
-            color: isUser ? theme.colors.bright.green : theme.colors.bright.cyan,
+            color: isUser
+                ? theme.colors.bright.green
+                : theme.colors.bright.cyan,
           ),
         ),
         const SizedBox(height: 4),

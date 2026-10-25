@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +8,7 @@ import 'package:clayton_agent/domain/models/rag_stream_update.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
 import 'package:clayton_agent/presentation/blocs/rag_bloc.dart';
 import 'package:clayton_agent/presentation/views/chat_screen.dart';
+
 import '../../support/omarchy_test_app.dart';
 
 class MockRagRepository implements RagRepository {

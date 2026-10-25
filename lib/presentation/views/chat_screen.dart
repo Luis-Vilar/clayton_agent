@@ -1,5 +1,4 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 
@@ -133,10 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : '-- tok/s',
             ),
           ),
-          OmarchyStatus(
-            accent: AnsiColor.blue,
-            child: Text('GPU $_gpuUsage%'),
-          ),
+          OmarchyStatus(accent: AnsiColor.blue, child: Text('GPU $_gpuUsage%')),
         ],
       ),
       child: BlocListener<RagBloc, RagState>(
@@ -151,7 +147,9 @@ class _ChatScreenState extends State<ChatScreen> {
             showOmarchyToast(
               context: context,
               accent: AnsiColor.yellow,
-              message: const Text('Base de datos vectorial vaciada por completo.'),
+              message: const Text(
+                'Base de datos vectorial vaciada por completo.',
+              ),
             );
           } else if (state is FileIngestedSuccessState) {
             setState(() {
@@ -218,9 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             Expanded(
-              child: _messages.isEmpty
-                  ? _emptyState(theme)
-                  : _messageList(),
+              child: _messages.isEmpty ? _emptyState(theme) : _messageList(),
             ),
             BlocBuilder<RagBloc, RagState>(
               builder: (context, state) {

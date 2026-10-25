@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_omarchy/flutter_omarchy.dart';
 
 /// Panel lateral que muestra la base de conocimiento local y sus acciones.

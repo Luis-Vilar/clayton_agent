@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_omarchy/flutter_omarchy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clayton_agent/data/services/gpu_metrics_service.dart';
 import 'package:clayton_agent/data/services/prompt_settings_service.dart';
@@ -7,6 +8,7 @@ import 'package:clayton_agent/domain/models/rag_stream_update.dart';
 import 'package:clayton_agent/domain/repositories/rag_repository.dart';
 import 'package:clayton_agent/presentation/blocs/rag_bloc.dart';
 import 'package:clayton_agent/presentation/widgets/agent_role_dialog.dart';
+import '../../support/omarchy_test_app.dart';
 
 class FakeRepo implements RagRepository {
   String role = 'Rol inicial';
@@ -54,16 +56,14 @@ void main() {
     addTearDown(bloc.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider.value(
+      wrapInOmarchy(
+        BlocProvider.value(
           value: bloc,
           child: Builder(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: ElevatedButton(
-                  onPressed: () => showAgentRoleDialog(context),
-                  child: const Text('abrir'),
-                ),
+            builder: (context) => Center(
+              child: OmarchyButton(
+                onPressed: () => showAgentRoleDialog(context),
+                child: const Text('abrir'),
               ),
             ),
           ),
@@ -80,9 +80,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(defaultAgentRole), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'Rol editado');
+    await tester.enterText(find.byType(EditableText), 'Rol editado');
     await tester.tap(find.text('Guardar'));
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
 
     expect(repo.role, 'Rol editado');
     expect(find.text('abrir'), findsOneWidget);
@@ -94,16 +95,13 @@ void main() {
     addTearDown(bloc.close);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider.value(
-          value: bloc,
-          child: const AgentRoleDialog(),
-        ),
+      wrapInOmarchy(
+        BlocProvider.value(value: bloc, child: const AgentRoleDialog()),
       ),
     );
 
-    final saveButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Guardar'),
+    final saveButton = tester.widget<OmarchyButton>(
+      find.widgetWithText(OmarchyButton, 'Guardar'),
     );
     expect(saveButton.onPressed, isNull);
   });

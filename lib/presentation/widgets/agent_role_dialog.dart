@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_omarchy/flutter_omarchy.dart';
 
 import '../../data/services/prompt_settings_service.dart';
 import '../blocs/rag_bloc.dart';
@@ -7,7 +8,7 @@ import '../blocs/rag_bloc.dart';
 Future<void> showAgentRoleDialog(BuildContext context) {
   final bloc = context.read<RagBloc>();
   bloc.add(LoadAgentRoleEvent());
-  return showDialog<void>(
+  return showOmarchyDialog<void>(
     context: context,
     builder: (_) => BlocProvider.value(
       value: bloc,
@@ -38,16 +39,17 @@ class _AgentRoleDialogState extends State<AgentRoleDialog> {
     return BlocConsumer<RagBloc, RagState>(
       listener: (context, state) {
         if (state is AgentRoleUpdatedState) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Rol del agente actualizado.')),
+          showOmarchyToast(
+            context: context,
+            accent: AnsiColor.green,
+            message: const Text('Rol del agente actualizado.'),
           );
           Navigator.of(context).pop();
         } else if (state is RagErrorState) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ ${state.errorMessage}'),
-              backgroundColor: Colors.redAccent,
-            ),
+          showOmarchyToast(
+            context: context,
+            accent: AnsiColor.red,
+            message: Text(state.errorMessage),
           );
         }
       },
@@ -58,38 +60,40 @@ class _AgentRoleDialogState extends State<AgentRoleDialog> {
           _controller.text = state.role;
           _loaded = true;
         }
-        return AlertDialog(
+        return OmarchyDialog(
+          maxWidth: 640,
           title: const Text('Rol del agente'),
           content: _loaded
               ? SizedBox(
                   width: 560,
-                  child: TextField(
+                  child: OmarchyTextInput(
                     controller: _controller,
                     minLines: 4,
                     maxLines: 10,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText:
-                          'Describe el papel del agente y el dominio de las respuestas.',
+                    placeholder: const Text(
+                      'Describe el papel del agente y el dominio de las respuestas.',
                     ),
                   ),
                 )
               : const SizedBox(
                   height: 80,
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: OmarchyLoader(accent: AnsiColor.blue),
+                  ),
                 ),
           actions: [
-            TextButton(
+            OmarchyButton(
               onPressed: _loaded
                   ? () => setState(() => _controller.text = defaultAgentRole)
                   : null,
               child: const Text('Restaurar ejemplo'),
             ),
-            TextButton(
+            OmarchyButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
+            OmarchyButton(
+              style: const OmarchyButtonStyle.filled(AnsiColor.blue),
               onPressed: _loaded
                   ? () => context.read<RagBloc>().add(
                       UpdateAgentRoleEvent(_controller.text),
